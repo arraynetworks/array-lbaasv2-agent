@@ -1,0 +1,14 @@
+[Unit]
+Description=ArrayNetworks Lbaas Agent
+After=neutron-server.service
+
+[Service]
+Environment=LIBGUESTFS_ATTACH_METHOD=appliance
+Type=notify
+NotifyAccess=all
+TimeoutStartSec=0
+ExecStart=/usr/bin/array-lbaasv2-agent --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/neutron_lbaas.conf --config-dir /etc/neutron/conf.d/neutron-server
+
+[Install]
+WantedBy=multi-user.target
+
