@@ -22,12 +22,12 @@ APV Driver for OpenStack LBaaSv2
 Introduction
 ------------
 
-The APV Driver for OpenStack LBaaSv2 is an OpenStack Neutron LBaaS service provider driver.
+The Array Agent for OpenStack Neutron is an OpenStack `Neutron plugin agent <https://docs.openstack.org/admin-guide/networking-arch.html#overview>`_. It works in conjunction with the Array Driver to manage Array ADC products via the OpenStack Neutron API.
 
 Compatibility
 -------------
 
-The APV Driver for OpenStack LBaaSv2 is compatible with OpenStack releases from Liberty forward.
+The Array Agent for OpenStack LBaaSv2 is compatible with OpenStack releases from Liberty forward.
 
 
 Copyright
