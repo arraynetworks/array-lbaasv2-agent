@@ -53,9 +53,8 @@ class ArrayAVXAPIDriver(object):
             raise ArrayADCException(msg)
         return va_name
 
-    def allocate_vip(self, argu):
-        """ allocation vip when create_vip"""
-
+    def create_loadbalancer(self, argu):
+        """ create a loadbalancer """
         va_name = self.get_va_name(argu)
 
         # create vip
@@ -69,26 +68,6 @@ class ArrayAVXAPIDriver(object):
                          argu['interface_mapping']
                         )
 
-        # create vs
-        self._create_vs(
-                        va_name,
-                        argu['vip_id'],
-                        argu['vip_address'],
-                        argu['protocol'],
-                        argu['protocol_port'],
-                        argu['connection_limit']
-                       )
-
-        # create policy
-        self._create_policy(
-                            va_name,
-                            argu['pool_id'],
-                            argu['vip_id'],
-                            argu['session_persistence_type'],
-                            argu['lb_algorithm'],
-                            argu['cookie_name']
-                           )
-
         # config the HA
         self.config_ha(
                        va_name,
@@ -96,25 +75,11 @@ class ArrayAVXAPIDriver(object):
                        argu['vip_address']
                       )
 
-    def deallocate_vip(self, argu):
-        """ Delete VIP in lb_delete_vip """
+
+    def delete_loadbalancer(self, argu):
+        """ delete a loadbalancer """
 
         va_name = self.get_va_name(argu)
-
-        # delete policy
-        self._delete_policy(
-                           va_name,
-                           argu['vip_id'],
-                           argu['session_persistence_type'],
-                           argu['lb_algorithm']
-                           )
-
-        # delete vs
-        self._delete_vs(
-                        va_name,
-                        argu['vip_id'],
-                        argu['protocol']
-                       )
 
         # delete vip
         self._delete_vip(
@@ -125,6 +90,35 @@ class ArrayAVXAPIDriver(object):
                         )
 
         self.no_ha(va_name, argu['vlan_tag'])
+
+
+    def create_listener(self, argu):
+        """ create a listener """
+
+        va_name = self.get_va_name(argu)
+
+        # create vs
+        self._create_vs(
+                        va_name,
+                        argu['vip_id'],
+                        argu['vip_address'],
+                        argu['protocol'],
+                        argu['protocol_port'],
+                        argu['connection_limit']
+                       )
+
+
+    def delete_listener(self, argu):
+        """ delete a listener """
+
+        va_name = self.get_va_name(argu)
+
+        # delete vs
+        self._delete_vs(
+                        va_name,
+                        argu['vip_id'],
+                        argu['protocol']
+                       )
 
 
     def _create_vip(self,
@@ -269,8 +263,8 @@ class ArrayAVXAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_avx_no_policy)
 
 
-    def create_group(self, argu):
-        """ Create SLB group in lb-pool-create"""
+    def create_pool(self, argu):
+        """ create a pool """
 
         va_name = self.get_va_name(argu)
 
@@ -279,9 +273,19 @@ class ArrayAVXAPIDriver(object):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_avx_create_group)
 
+        # create policy
+        self._create_policy(
+                            va_name,
+                            argu['pool_id'],
+                            argu['vip_id'],
+                            argu['session_persistence_type'],
+                            argu['lb_algorithm'],
+                            argu['cookie_name']
+                           )
 
-    def delete_group(self, argu):
-        """Delete SLB group in lb-pool-delete"""
+
+    def delete_pool(self, argu):
+        """ delete a pool """
 
         va_name = self.get_va_name(argu)
 
@@ -289,6 +293,15 @@ class ArrayAVXAPIDriver(object):
         cmd_avx_no_group = "va run %s \"%s\"" % (va_name, cmd_apv_no_group)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_avx_no_group)
+
+        # delete policy
+        self._delete_policy(
+                           va_name,
+                           argu['vip_id'],
+                           argu['session_persistence_type'],
+                           argu['lb_algorithm']
+                           )
+
         self.cache.remove_group(argu['tenant_id'])
 
 
@@ -358,7 +371,6 @@ class ArrayAVXAPIDriver(object):
         va_name = self.get_va_name(argu)
 
         cmd_apv_detach_hm = ADCDevice.detach_hm_to_group(argu['pool_id'], argu['hm_id'])
-
         cmd_apv_no_hm = ADCDevice.no_health_monitor(argu['hm_id'])
 
         cmd_avx_detach_hm = "va run %s \"%s\"" % (va_name, cmd_apv_detach_hm)
