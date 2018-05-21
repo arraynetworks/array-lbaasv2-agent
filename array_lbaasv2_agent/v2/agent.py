@@ -28,9 +28,12 @@ except ImportError as CriticalError:
                                          frame=frame)
     sys.exit(CriticalError.errno)
 
-
 try:
     from neutron.agent.common import config
+except ImportError:
+    from neutron.conf.agent import common as config
+
+try:
     from neutron.common import config as common_config
     from neutron.common import rpc as n_rpc
 except ImportError as Error:
