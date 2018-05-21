@@ -16,7 +16,11 @@ from oslo_log import helpers as log_helpers
 import logging
 import oslo_messaging
 
-from neutron import context
+try:
+    from neutron import context
+except ImportError as CriticalError:
+    from neutron_lib import context
+
 from neutron.agent import rpc as agent_rpc
 
 from oslo_service import loopingcall
