@@ -364,7 +364,7 @@ class ArrayAPVAPIDriver(object):
             interface_name = "vlan." + vlan_tag
 
         cmd_apv_config_virtual_iface = ADCDevice.cluster_config_virtual_interface(interface_name)
-        cmd_apv_config_virtual_vip = ADCDevice.cluster_config_vip(interface_name)
+        cmd_apv_config_virtual_vip = ADCDevice.cluster_config_vip(interface_name, vip_address)
         cmd_apv_cluster_enable = ADCDevice.cluster_enable(interface_name)
 
         priority = 1
