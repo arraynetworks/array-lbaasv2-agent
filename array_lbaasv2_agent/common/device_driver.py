@@ -174,7 +174,7 @@ class ArrayADCDriver(object):
         argu['connection_limit'] = listener['connection_limit']
         argu['protocol'] = listener['protocol']
         argu['protocol_port'] = listener['protocol_port']
-        argu['vip_id'] = listener['loadbalancer_id']
+        argu['listener_id'] = listener['id']
         argu['vip_address'] = lb['vip_port']['fixed_ips'][0]['ip_address']
 
         self.driver.create_listener(argu)
@@ -196,7 +196,7 @@ class ArrayADCDriver(object):
         argu = {}
 
         argu['tenant_id'] = listener['tenant_id']
-        argu['vip_id'] = listener['loadbalancer_id']
+        argu['listener_id'] = listener['listener_id']
         argu['protocol'] = listener['protocol']
 
         self.driver.delete_listener(argu)
@@ -215,7 +215,7 @@ class ArrayADCDriver(object):
 
         argu['tenant_id'] = pool['tenant_id']
         argu['pool_id'] = pool['id']
-        argu['vip_id'] = pool['loadbalancer_id']
+        argu['listener_id'] = pool['listener_id']
         argu['session_persistence_type'] = sp_type
         argu['cookie_name'] = ck_name
         argu['lb_algorithm'] = pool['lb_algorithm']
@@ -260,7 +260,7 @@ class ArrayADCDriver(object):
 
         argu['tenant_id'] = pool['tenant_id']
         argu['pool_id'] = pool['id']
-        argu['vip_id'] = pool['loadbalancer_id']
+        argu['listener_id'] = pool['listener_id']
         argu['session_persistence_type'] = sp_type
         argu['cookie_name'] = ck_name
         argu['lb_algorithm'] = pool['lb_algorithm']
