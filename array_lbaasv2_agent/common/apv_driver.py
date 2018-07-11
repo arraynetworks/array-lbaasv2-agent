@@ -72,7 +72,7 @@ class ArrayAPVAPIDriver(object):
             LOG.error("In create_listener, it should not pass the None.")
 
         # create vs
-        self._create_vs(argu['vip_id'],
+        self._create_vs(argu['listener_id'],
                         argu['vip_address'],
                         argu['protocol'],
                         argu['protocol_port'],
@@ -88,7 +88,7 @@ class ArrayAPVAPIDriver(object):
 
         # delete vs
         self._delete_vs(
-                       argu['vip_id'],
+                       argu['listener_id'],
                        argu['protocol']
                        )
 
@@ -154,14 +154,14 @@ class ArrayAPVAPIDriver(object):
 
 
     def _create_vs(self,
-                   vip_id,
+                   listener_id,
                    vip_address,
                    protocol,
                    protocol_port,
                    connection_limit):
 
         cmd_apv_create_vs = ADCDevice.create_virtual_service(
-                                                             vip_id,
+                                                             listener_id,
                                                              vip_address,
                                                              protocol_port,
                                                              protocol,
@@ -171,9 +171,9 @@ class ArrayAPVAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_create_vs)
 
 
-    def _delete_vs(self, vip_id, protocol):
+    def _delete_vs(self, listener_id, protocol):
         cmd_apv_no_vs = ADCDevice.no_virtual_service(
-                                                     vip_id,
+                                                     listener_id,
                                                      protocol
                                                     )
         for base_rest_url in self.base_rest_urls:
@@ -182,14 +182,14 @@ class ArrayAPVAPIDriver(object):
 
     def _create_policy(self,
                        pool_id,
-                       vip_id,
+                       listener_id,
                        session_persistence_type,
                        lb_algorithm,
                        cookie_name):
         """ Create SLB policy """
 
         cmd_apv_create_policy = ADCDevice.create_policy(
-                                                        vip_id,
+                                                        listener_id,
                                                         pool_id,
                                                         lb_algorithm,
                                                         session_persistence_type,
@@ -200,10 +200,10 @@ class ArrayAPVAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_create_policy)
 
 
-    def _delete_policy(self, vip_id, session_persistence_type, lb_algorithm):
+    def _delete_policy(self, listener_id, session_persistence_type, lb_algorithm):
         """ Delete SLB policy """
         cmd_apv_no_policy = ADCDevice.no_policy(
-                                                vip_id,
+                                                listener_id,
                                                 lb_algorithm,
                                                 session_persistence_type
                                                )
@@ -223,7 +223,7 @@ class ArrayAPVAPIDriver(object):
 
         # create policy
         self._create_policy(argu['pool_id'],
-                            argu['vip_id'],
+                            argu['listener_id'],
                             argu['session_persistence_type'],
                             argu['lb_algorithm'],
                             argu['cookie_name']
@@ -238,7 +238,7 @@ class ArrayAPVAPIDriver(object):
 
         # delete policy
         self._delete_policy(
-                           argu['vip_id'],
+                           argu['listener_id'],
                            argu['session_persistence_type'],
                            argu['lb_algorithm']
                            )

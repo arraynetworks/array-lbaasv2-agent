@@ -100,7 +100,7 @@ class ArrayAVXAPIDriver(object):
         # create vs
         self._create_vs(
                         va_name,
-                        argu['vip_id'],
+                        argu['listener_id'],
                         argu['vip_address'],
                         argu['protocol'],
                         argu['protocol_port'],
@@ -116,7 +116,7 @@ class ArrayAVXAPIDriver(object):
         # delete vs
         self._delete_vs(
                         va_name,
-                        argu['vip_id'],
+                        argu['listener_id'],
                         argu['protocol']
                        )
 
@@ -196,14 +196,14 @@ class ArrayAVXAPIDriver(object):
 
     def _create_vs(self,
                    va_name,
-                   vip_id,
+                   listener_id,
                    vip_address,
                    protocol,
                    protocol_port,
                    connection_limit):
 
         cmd_apv_create_vs = ADCDevice.create_virtual_service(
-                                                             vip_id,
+                                                             listener_id,
                                                              vip_address,
                                                              protocol_port,
                                                              protocol,
@@ -214,9 +214,9 @@ class ArrayAVXAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_avx_create_vs)
 
 
-    def _delete_vs(self, va_name, vip_id, protocol):
+    def _delete_vs(self, va_name, listener_id, protocol):
         cmd_apv_no_vs = ADCDevice.no_virtual_service(
-                                                     vip_id,
+                                                     listener_id,
                                                      protocol
                                                     )
         cmd_avx_no_vs = "va run %s \"%s\"" % (va_name, cmd_apv_no_vs)
@@ -227,14 +227,14 @@ class ArrayAVXAPIDriver(object):
     def _create_policy(self,
                        va_name,
                        pool_id,
-                       vip_id,
+                       listener_id,
                        session_persistence_type,
                        lb_algorithm,
                        cookie_name):
         """ Create SLB policy """
 
         cmd_apv_create_policy = ADCDevice.create_policy(
-                                                        vip_id,
+                                                        listener_id,
                                                         pool_id,
                                                         lb_algorithm,
                                                         session_persistence_type,
@@ -248,13 +248,13 @@ class ArrayAVXAPIDriver(object):
 
     def _delete_policy(self,
                        va_name,
-                       vip_id,
+                       listener_id,
                        session_persistence_type,
                        lb_algorithm
                       ):
         """ Delete SLB policy """
         cmd_apv_no_policy = ADCDevice.no_policy(
-                                                vip_id,
+                                                listener_id,
                                                 lb_algorithm,
                                                 session_persistence_type
                                                )
@@ -277,7 +277,7 @@ class ArrayAVXAPIDriver(object):
         self._create_policy(
                             va_name,
                             argu['pool_id'],
-                            argu['vip_id'],
+                            argu['listener_id'],
                             argu['session_persistence_type'],
                             argu['lb_algorithm'],
                             argu['cookie_name']
@@ -297,7 +297,7 @@ class ArrayAVXAPIDriver(object):
         # delete policy
         self._delete_policy(
                            va_name,
-                           argu['vip_id'],
+                           argu['listener_id'],
                            argu['session_persistence_type'],
                            argu['lb_algorithm']
                            )
