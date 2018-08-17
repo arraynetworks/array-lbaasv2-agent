@@ -17,6 +17,8 @@ from oslo_config import cfg
 from oslo_utils import importutils
 import logging
 
+from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
+from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
 
 LOG = logging.getLogger(__name__)
 DRIVER_NAME = 'ArrayAPV'
@@ -44,7 +46,7 @@ OPTS = [
     ),
     cfg.StrOpt(
         'array_device_driver',
-        default=('array_lbaasv2_agent.common.apv_driver.ArrayAPVAPIDriver'),
+        default=('array_lbaasv2_agent.common.avx_driver.ArrayAVXAPIDriver'),
         help=('The driver used to provision ADC product')
     )
 ]
@@ -106,6 +108,19 @@ class ArrayADCDriver(object):
         subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
         member_network = netaddr.IPNetwork(subnet['cidr'])
 
+        if not argu['vlan_tag']:
+            segment_id = None
+            network_type = None
+            network = self.plugin_rpc.get_network(self.context, subnet['network_id'])
+            if PROV_NET_TYPE in network:
+                network_type = network[PROV_NET_TYPE]
+            if PROV_SEGMT_ID in network:
+                segment_id = network[PROV_SEGMT_ID]
+            if segment_id:
+                argu['vlan_tag'] = str(segment_id)
+            if network_type:
+                argu['network_type'] = network_type
+
         interface_mapping = {}
         if len(self.hosts) > 1:
             cnt = 0
@@ -150,6 +165,19 @@ class ArrayADCDriver(object):
         argu['vip_id'] = lb['id']
         argu['vip_address'] = lb['vip_address']
 
+        if not argu['vlan_tag']:
+            segment_id = None
+            network_type = None
+            network = self.plugin_rpc.get_network(self.context, lb['vip_port']['network_id'])
+            if PROV_NET_TYPE in network:
+                network_type = network[PROV_NET_TYPE]
+            if PROV_SEGMT_ID in network:
+                segment_id = network[PROV_SEGMT_ID]
+            if segment_id:
+                argu['vlan_tag'] = str(segment_id)
+            if network_type:
+                argu['network_type'] = network_type
+
         if len(self.hosts) > 1:
             LOG.debug("Will delete the port created by ourselves.")
             mapping = self.client.get_cached_map(argu)
@@ -176,6 +204,7 @@ class ArrayADCDriver(object):
         argu['protocol_port'] = listener['protocol_port']
         argu['listener_id'] = listener['id']
         argu['vip_address'] = lb['vip_port']['fixed_ips'][0]['ip_address']
+        argu['vip_id'] = lb['stats']['loadbalancer_id']
 
         self.driver.create_listener(argu)
 
@@ -196,8 +225,11 @@ class ArrayADCDriver(object):
         argu = {}
 
         argu['tenant_id'] = listener['tenant_id']
-        argu['listener_id'] = listener['listener_id']
+        argu['listener_id'] = listener['id']
         argu['protocol'] = listener['protocol']
+
+        lb = listener['loadbalancer']
+        argu['vip_id'] = lb['stats']['loadbalancer_id']
 
         self.driver.delete_listener(argu)
 
@@ -215,10 +247,13 @@ class ArrayADCDriver(object):
 
         argu['tenant_id'] = pool['tenant_id']
         argu['pool_id'] = pool['id']
-        argu['listener_id'] = pool['listener_id']
+        argu['listener_id'] = pool['listener']['id']
         argu['session_persistence_type'] = sp_type
         argu['cookie_name'] = ck_name
         argu['lb_algorithm'] = pool['lb_algorithm']
+
+        lb = pool['loadbalancer']
+        argu['vip_id'] = lb['stats']['loadbalancer_id']
         self.driver.create_pool(argu)
 
 
@@ -260,10 +295,13 @@ class ArrayADCDriver(object):
 
         argu['tenant_id'] = pool['tenant_id']
         argu['pool_id'] = pool['id']
-        argu['listener_id'] = pool['listener_id']
+        argu['listener_id'] = pool['listener']['id']
         argu['session_persistence_type'] = sp_type
         argu['cookie_name'] = ck_name
         argu['lb_algorithm'] = pool['lb_algorithm']
+
+        lb = pool['loadbalancer']
+        argu['vip_id'] = lb['stats']['loadbalancer_id']
         self.driver.delete_pool(argu)
 
     def create_member(self, obj):
@@ -279,6 +317,7 @@ class ArrayADCDriver(object):
         argu['pool_id'] = member['pool_id']
         argu['member_weight'] = member['weight']
 
+        argu['vip_id'] = member['pool']['loadbalancer_id']
         self.driver.create_member(argu)
 
     def update_member(self, obj, old_obj):
@@ -297,6 +336,8 @@ class ArrayADCDriver(object):
         argu['member_id'] = member['id']
         argu['protocol'] = pool['protocol']
 
+        argu['vip_id'] = member['pool']['loadbalancer_id']
+
         self.driver.delete_member(argu)
 
     def create_health_monitor(self, obj):
@@ -313,11 +354,18 @@ class ArrayADCDriver(object):
         argu['hm_url'] = hm['url_path']
         argu['hm_expected_codes'] = hm['expected_codes']
         argu['pool_id'] = hm['pool']['id']
+        argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.create_health_monitor(argu)
 
     def update_health_monitor(self, obj, old_obj):
-        self.delete_health_monitor(old_obj)
-        self.create_health_monitor(obj)
+        need_recreate = False
+        for changed in ('delay', 'timeout', 'max_retries', 'http_method', 'url_path', 'expected_codes'):
+            if obj[changed] != old_obj[changed]:
+                need_recreate = True
+
+        if need_recreate:
+            self.delete_health_monitor(old_obj)
+            self.create_health_monitor(obj)
 
     def delete_health_monitor(self, obj):
         hm = obj
@@ -326,5 +374,6 @@ class ArrayADCDriver(object):
         argu['tenant_id'] = hm['tenant_id']
         argu['hm_id'] = hm['id']
         argu['pool_id'] = hm['pool']['id']
+        argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.delete_health_monitor(argu)
 
