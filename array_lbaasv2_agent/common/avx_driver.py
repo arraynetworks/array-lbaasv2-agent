@@ -31,7 +31,7 @@ class ArrayAVXAPIDriver(object):
         self.in_interface = in_interface
         self.hostnames = management_ip
         self.base_rest_urls = ["https://" + host + ":9997/rest/avx" for host in self.hostnames]
-        self.cache = LogicalAVXCache()
+        self.cache = LogicalAVXCache(in_interface)
 
 
     def get_auth(self):
@@ -43,13 +43,14 @@ class ArrayAVXAPIDriver(object):
             raise ArrayADCException(msg)
 
         tenant_id = argu.get('tenant_id', None)
-        if not tenant_id:
+        vip_id = argu.get('vip_id', None)
+        if not tenant_id or not vip_id:
             msg = "No tenant_id in argument, raise it"
             raise ArrayADCException(msg)
 
-        va_name = self.cache.get_va_by_tenant(tenant_id)
+        va_name = self.cache.get_va_by_vip(tenant_id, vip_id)
         if not va_name:
-            msg = "Cannot get the vAPV by tenant_id(%s)" % tenant_id
+            msg = "Cannot get the vAPV by vip_id(%s)" % vip_id
             raise ArrayADCException(msg)
         return va_name
 
@@ -268,7 +269,10 @@ class ArrayAVXAPIDriver(object):
 
         va_name = self.get_va_name(argu)
 
-        cmd_apv_create_group = ADCDevice.create_group(argu['pool_id'], argu['lb_algorithm'])
+        cmd_apv_create_group = ADCDevice.create_group(argu['pool_id'],
+                                                      argu['lb_algorithm'],
+                                                      argu['session_persistence_type']
+                                                     )
         cmd_avx_create_group = "va run %s \"%s\"" % (va_name, cmd_apv_create_group)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_avx_create_group)
@@ -301,8 +305,6 @@ class ArrayAVXAPIDriver(object):
                            argu['session_persistence_type'],
                            argu['lb_algorithm']
                            )
-
-        self.cache.remove_group(argu['tenant_id'])
 
 
     def create_member(self, argu):

@@ -83,16 +83,21 @@ class LogicalAVXCache(object):
     The cache of Logical APVs in AVX
     """
     va_name_prefix = "va"
-    def __init__(self):
+    def __init__(self, in_interface):
         self.mapping = {}
-        self.va_pools = None
-        self._generate_va_pools()
+        self.in_interface = in_interface
+        self.va_pools = self._generate_va_pools()
         self._reload()
 
     # FIXME: should automatically generate the VA following
     # AVX's model.
     def _generate_va_pools(self):
-        self.va_pools = ['va01', 'va02', 'va03', 'va04']
+        LOG.debug("The va_pools will be generated.")
+        vas = []
+        for i in range(1, 17):
+            va_name = "%s_va%02d" % (self.in_interface, i)
+            vas.append(va_name)
+        return vas
 
     def _reload(self):
         """ Reload the mapping between tenant and VA """
@@ -101,11 +106,10 @@ class LogicalAVXCache(object):
         with open(TENANT_AVX_MAPPING, 'r') as fd:
             self.mapping = json.load(fd)
             LOG.debug("After loading, the mapping is %s", self.mapping)
-        if self.mapping:
-            for tid in self.mapping.keys():
-                va_name = self.get_va_by_tenant(tid)
-                self.va_pools.remove(va_name)
-            LOG.debug("For now, va_pools is %s", self.va_pools)
+        self.va_pools = self._generate_va_pools()
+        for dv in self.mapping.values():
+            self.va_pools = [x for x in self.va_pools if x != dv['va_name']]
+        LOG.debug("For now, va_pools is %s", self.va_pools)
 
     def dump(self):
         with open(TENANT_AVX_MAPPING, 'w') as fd:
@@ -116,14 +120,15 @@ class LogicalAVXCache(object):
         interface_map = {}
         va_name = None
 
-        if not tenant_id or not vip_id or not host or not port_id:
+        if not vip_id or not host or not port_id:
             LOG.debug("The argument cannot be NONE")
             return va_name
 
-        lb_item = self.mapping.get(tenant_id, None)
+        self._reload()
+        lb_item = self.mapping.get(vip_id, None)
         if lb_item:
             va_name = lb_item['va_name']
-            interface_map = lb_item.get(vip_id, None)
+            interface_map = lb_item.get('host_list', None)
             if not interface_map:
                 interface_map = {}
             interface_map[host] = port_id
@@ -132,94 +137,64 @@ class LogicalAVXCache(object):
             self.dump()
         return va_name
 
-    def remove(self, tenant_id):
-        if not tenant_id:
+    def remove_vip(self, tenant_id, vip_id):
+        if not vip_id:
             LOG.debug("The argument cannot be NONE")
             return None
         va_name = None
-        lb_item = self.mapping.get(tenant_id, None)
+        self._reload()
+        lb_item = self.mapping.get(vip_id, None)
         if lb_item:
             va_name = lb_item['va_name']
             self.va_pools.append(va_name)
-            LOG.debug("After running remove, va_pools is %s", self.va_pools)
-            del self.mapping[tenant_id]
+            del self.mapping[vip_id]
             self.dump()
+            LOG.debug("After running remove_vip, va_pools is %s", self.va_pools)
         return va_name
 
-    def remove_group(self, tenant_id):
-        if not tenant_id:
-            LOG.debug("The argument cannot be NONE")
+    def get_va_by_vip(self, tenant_id, vip_id):
+        if not vip_id:
             return None
-        va_name = None
-        lb_item = self.mapping.get(tenant_id, None)
-        if lb_item:
-            va_name = lb_item['va_name']
-            if len(lb_item) <= 1:
-                del self.mapping[tenant_id]
-                LOG.debug("Will add (%s) into va_pools", va_name)
-                self.va_pools.append(va_name)
-                LOG.debug("After running remove_group, va_pools is %s", self.va_pools)
-            self.dump()
-        return va_name
-
-    def remove_vip(self, tenant_id, vip_id):
-        if not tenant_id or not vip_id:
-            LOG.debug("The argument cannot be NONE")
-            return None
-        va_name = None
-        lb_item = self.mapping.get(tenant_id, None)
-        if lb_item:
-            va_name = lb_item['va_name']
-            lb_item.pop(vip_id, None)
-            if len(lb_item) <= 1:
-                del self.mapping[tenant_id]
-                LOG.debug("Will add (%s) into va_pools", va_name)
-                self.va_pools.append(va_name)
-                LOG.debug("After running remove_vip, va_pools is %s", self.va_pools)
-            self.dump()
-        return va_name
-
-    def get_va_by_tenant(self, tenant_id):
-        if not tenant_id:
-            return None
-        lb_item = self.mapping.get(tenant_id, None)
+        lb_item = self.mapping.get(vip_id, None)
         va_name = None
         if lb_item:
             va_name = lb_item['va_name']
         else:
             lb_item = {}
+            self._reload()
             LOG.debug("Before allocate, va_pools is %s", self.va_pools)
             if len(self.va_pools) == 0:
                 LOG.debug("There is no enough VAs")
                 return va_name
             va_name = self.va_pools.pop(0)
             lb_item['va_name'] = va_name
-            self.mapping[tenant_id] = lb_item
+            self.mapping[vip_id] = lb_item
             LOG.debug("After allocate, va_pools is %s", self.va_pools)
             self.dump()
         return va_name
 
     def get_interface_map_by_vip(self, tenant_id, vip_id):
         interface_map = None
-        if not vip_id or not tenant_id:
+        if not vip_id:
             return interface_map
 
-        lb_item = self.mapping.get(tenant_id, None)
+        lb_item = self.mapping.get(vip_id, None)
         if lb_item:
-            interface_map = lb_item.get(vip_id, None)
+            interface_map = lb_item.get('host_list', None)
         return interface_map
 
     def print_cache(self):
         LOG.debug("va_pools is %s", self.va_pools)
         for k in self.mapping.keys():
-            LOG.debug("Tenant ID: %s" % k)
+            LOG.debug("VIP ID: %s" % k)
             for vk in self.mapping[k].keys():
                 if vk == 'va_name':
 		    LOG.debug("va_name: %s" % self.mapping[k][vk])
-                else:
-                    LOG.debug("vip: %s" % vk)
+                elif vk == 'host_list':
                     for vkk in self.mapping[k][vk].keys():
                         LOG.debug("Host(%s): port_id(%s)" % (vkk, self.mapping[k][vk][vkk]))
+                else:
+                        LOG.debug("shouldn't be print")
 
 '''
 if __name__ == '__main__':
@@ -228,9 +203,9 @@ if __name__ == '__main__':
     cache.print_cache()
     #cache.remove_vip("first_tenant_id", "first_vip_id")
     #cache.remove_vip("second_tenant_id", "second_vip_id")
-    va_name = cache.get_va_by_tenant("first_tenant_id")
+    va_name = cache.get_va_by_vip("first_tenant_id")
     #LOG.debug("va_name: %s" % va_name)
-    #va_name = cache.get_va_by_tenant("second_tenant_id")
+    #va_name = cache.get_va_by_vip("second_tenant_id")
     #LOG.debug("va_name: %s" % va_name)
     cache.put("first_tenant_id", "first_vip_id", "host_1", "first_port_id")
     cache.put("first_tenant_id", "first_vip_id", "host_2", "second_port_id")

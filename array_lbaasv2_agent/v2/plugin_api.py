@@ -104,6 +104,10 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_subnet', subnet_id=subnet_id)
 
+    def get_network(self, context, network_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_network', network_id=network_id)
+
     def get_port(self, context, port_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_port', port_id=port_id)
