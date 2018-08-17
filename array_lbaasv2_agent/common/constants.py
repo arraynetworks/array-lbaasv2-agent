@@ -25,4 +25,7 @@ AGENT_BINARY_NAME = 'array-lbaasv2-agent'
 ARRAY_ERROR = plugin_const.ERROR
 ARRAY_AGENT_TYPE_LOADBALANCERV2 = lb_const.AGENT_TYPE_LOADBALANCERV2
 
+PROV_SEGMT_ID = 'provider:segmentation_id'
+PROV_NET_TYPE = 'provider:network_type'
+
 RPC_API_VERSION = '1.0'
