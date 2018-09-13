@@ -28,7 +28,7 @@ class ArrayAVXAPIDriver(object):
     def __init__(self, management_ip, in_interface, user_name, user_passwd):
         self.user_name = user_name
         self.user_passwd = user_passwd
-        self.in_interface = "port2"
+        self.in_interface = in_interface
         self.hostnames = management_ip
         self.base_rest_urls = ["https://" + host + ":9997/rest/avx" for host in self.hostnames]
         self.cache = LogicalAVXCache(in_interface)
@@ -109,29 +109,17 @@ class ArrayAVXAPIDriver(object):
                        )
 
 
-    def update_listener(self, argu):
-        """ update a listener """
-        va_name = self.get_va_name(argu)
-
-        self._delete_vs(va_name, argu['listener_id'], argu['protocol'])
-        self._create_vs(va_name, argu['listener_id'], argu['vip_address'],
-                        argu['protocol'], argu['protocol_port'],
-                        argu['connection_limit'])
-
-        if argu['pool_id']:
-            self._create_policy(va_name, argu['pool_id'], argu['listener_id'],
-                                argu['session_persistence_type'], argu['lb_algorithm'],
-                                argu['cookie_name'])
-
-
     def delete_listener(self, argu):
         """ delete a listener """
 
         va_name = self.get_va_name(argu)
 
         # delete vs
-        self._delete_vs(va_name, argu['listener_id'], argu['protocol'])
-
+        self._delete_vs(
+                        va_name,
+                        argu['listener_id'],
+                        argu['protocol']
+                       )
 
 
     def _create_vip(self,
@@ -298,35 +286,6 @@ class ArrayAVXAPIDriver(object):
                             argu['lb_algorithm'],
                             argu['cookie_name']
                            )
-
-
-    def update_pool(self, argu):
-        """ update a pool """
-
-        va_name = self.get_va_name(argu)
-
-        cmd_apv_no_group = ADCDevice.no_group(argu['pool_id'])
-        cmd_avx_no_group = "va run %s \"%s\"" % (va_name, cmd_apv_no_group)
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_avx_no_group)
-
-        self.create_pool(argu)
-
-        for member in argu['members']:
-            cmd_apv_add_rs_into_group = ADCDevice.add_rs_into_group(
-                                                                   argu['pool_id'],
-                                                                   member['member_id'],
-                                                                   member['member_weight']
-                                                                   )
-            cmd_avx_add_rs_into_group = "va run %s \"%s\"" % (va_name, cmd_apv_add_rs_into_group)
-            for base_rest_url in self.base_rest_urls:
-                self.run_cli_extend(base_rest_url, cmd_avx_add_rs_into_group)
-
-        if not argu['hm_id']:
-            cmd_apv_attach_hm = ADCDevice.attach_hm_to_group(argu['pool_id'], argu['hm_id'])
-            cmd_avx_attach_hm = "va run %s \"%s\"" % (va_name, cmd_apv_attach_hm)
-            for base_rest_url in self.base_rest_urls:
-                self.run_cli_extend(base_rest_url, cmd_avx_attach_hm)
 
 
     def delete_pool(self, argu):
