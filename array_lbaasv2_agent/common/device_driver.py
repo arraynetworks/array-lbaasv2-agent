@@ -209,15 +209,21 @@ class ArrayADCDriver(object):
         self.driver.create_listener(argu)
 
 
-    def update_listener(self, obj, old_obj):
+    def update_listener(self, listener, old_listener):
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Listener
         # handle the change of "connection_limit" only
-        if obj['connection_limit'] != old_obj['connection_limit']:
-            # firstly delete this listener, it will cause policy is deleted as well
-            self.delete_listener(old_obj)
-
-            # re-create listener and policy
-            self.create_listener(obj)
+        argu = {}
+        if listener['connection_limit'] != old_listener['connection_limit']:
+            lb = listener['loadbalancer']
+            argu['tenant_id'] = listener['tenant_id']
+            argu['connection_limit'] = listener['connection_limit']
+            argu['protocol'] = listener['protocol']
+            argu['protocol_port'] = listener['protocol_port']
+            argu['listener_id'] = listener['id']
+            argu['vip_address'] = lb['vip_port']['fixed_ips'][0]['ip_address']
+            argu['vip_id'] = lb['stats']['loadbalancer_id']
+            argu['pool_id'] = listener['default_pool_id']
+        self.driver.update_listener(argu)
 
 
     def delete_listener(self, obj):
@@ -257,30 +263,37 @@ class ArrayADCDriver(object):
         self.driver.create_pool(argu)
 
 
-    def update_pool(self, obj, old_obj):
+    def update_pool(self, pool, old_pool):
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Pool
         need_recreate = False
+        argu = {}
         for changed in ('lb_algorithm', 'session_persistence'):
-            if obj[changed] != old_obj[changed]:
+            if pool[changed] != old_pool[changed]:
                 need_recreate = True
 
         if need_recreate:
             LOG.debug("Need to recreate the pool....")
 
-            # firstly delete old group
-            self.delete_pool(old_obj)
+            argu['pool_id'] = pool['id']
+            argu['tenant_id'] = pool['tenant_id']
+            argu['session_persistence_type'] = pool['session_persistence']['type']
+            argu['cookie_name'] = pool['session_persistence']['cookie_name']
+            argu['lb_algorithm'] = pool['lb_algorithm']
+            argu['hm_id'] = pool['healthmonitor_id']
+            argu['vip_id'] = pool['loadbalancer_id']
 
-            # re-create group
-            self.create_pool(obj)
+            listener = pool['listener']
+            argu['listener_id'] = listener['id']
 
-            # re-create members
-            for member in obj['members']:
-                self.create_member(member)
+            members = []
+            t_member = {}
+            for member in listener['default_pool']['members']:
+                t_member['member_id'] = member['id']
+                t_member['member_weight'] = member['weight']
+                members.append(t_member)
+            argu['members'] = members
+            self.driver.update_pool(argu)
 
-            # re-create healthmonitor
-            if obj['healthmonitor']:
-                # FIXME: should directly update the hm
-                self.update_health_monitor(obj['healthmonitor'], old_obj['healthmonitor'])
 
     def delete_pool(self, obj):
         pool = obj
