@@ -217,7 +217,7 @@ class ArrayAPVAPIDriver(object):
         if not argu:
             LOG.error("In create_pool, it should not pass the None.")
 
-        cmd_apv_create_group = ADCDevice.create_group(argu['pool_id'], argu['lb_algorithm'])
+        cmd_apv_create_group = ADCDevice.create_group(argu['pool_id'], argu['lb_algorithm'], argu['session_persistence_type'])
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_create_group)
 
