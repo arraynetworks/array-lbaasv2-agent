@@ -20,6 +20,9 @@ from array_lbaasv2_agent.common.adc_device import ADCDevice
 
 LOG = logging.getLogger(__name__)
 
+def get_cluster_id_from_va_name(va_name):
+    idx=va_name.find('va')
+    return int(va_name[idx+2:])
 
 class ArrayAVXAPIDriver(object):
     """ The real implementation on host to push config to
@@ -70,7 +73,7 @@ class ArrayAVXAPIDriver(object):
                         )
 
         # config the HA
-        self.config_ha(
+        self.configure_cluster(
                        va_name,
                        argu['vlan_tag'],
                        argu['vip_address']
@@ -394,8 +397,7 @@ class ArrayAVXAPIDriver(object):
             msg = r.text
             raise ArrayADCException(msg, r.status_code)
 
-    def no_ha(self, va_name, vlan_tag):
-        """ clear the HA configuration when delete_vip """
+    def configure_cluster(self, va_name, vip_address, vlan_tag):
 
         if len(self.hostnames) == 1:
             LOG.debug("Only one machine, doesn't need to configure HA")
@@ -404,51 +406,50 @@ class ArrayAVXAPIDriver(object):
         interface_name = self.in_interface
         if vlan_tag:
             interface_name = "vlan." + vlan_tag
+        cluster_id = get_cluster_id_from_va_name(va_name)
 
-        cmd_apv_disable_cluster = ADCDevice.cluster_disable(interface_name)
-        cmd_avx_disable_cluster = "va run %s \"%s\"" % (va_name, cmd_apv_disable_cluster)
+        # configure a virtual interface
+        cmd_config_virtual_interface = ADCDevice.cluster_config_virtual_interface(interface_name, cluster_id)
+        cmd_avx_config_virtual_interface = "va run %s \"%s\"" % (va_name, cmd_config_virtual_interface)
+        # configure virtual vip
+        cmd_config_virtual_vip = ADCDevice.cluster_config_vip(interface_name, cluster_id, vip_address)
+        cmd_avx_config_virtual_vip = "va run %s \"%s\"" % (va_name, cmd_config_virtual_vip)
+        # configure virtual priority
+        cmd_config_virtual_priority_99 = ADCDevice.cluster_config_priority(interface_name, cluster_id, 90)
+        cmd_avx_config_virtual_priority_99 = "va run %s \"%s\"" % (va_name, cmd_config_virtual_priority_99)
 
-        cmd_apv_clear_cluster_config = ADCDevice.cluster_clear_virtual_interface(interface_name)
-        cmd_avx_clear_cluster_config = "va run %s \"%s\"" % (va_name, cmd_apv_clear_cluster_config)
+        cmd_config_virtual_priority_100 = ADCDevice.cluster_config_priority(interface_name, cluster_id, 100)
+        cmd_avx_config_virtual_priority_100 = "va run %s \"%s\"" % (va_name, cmd_config_virtual_priority_100)
+        # enable cluster
+        cmd_enable_cluster = ADCDevice.cluster_enable(cluster_id)
+        cmd_avx_enable_cluster = "va run %s \"%s\"" % (va_name, cmd_enable_cluster)
+        is_master = True
         for base_rest_url in self.base_rest_urls:
-            # disable the virtual cluster
-            self.run_cli_extend(base_rest_url, cmd_avx_disable_cluster)
-
-            # clear the configuration of this virtual ifname
-            self.run_cli_extend(base_rest_url, cmd_avx_clear_cluster_config)
-
-
-
-    def config_ha(self, va_name, vlan_tag, vip_address):
-        """ set the HA configuration when delete_vip """
-
-        if len(self.hostnames) == 1:
-            LOG.debug("Only one machine, doesn't need to configure HA")
-            return True
-
-        interface_name = self.in_interface
-        if vlan_tag:
-            interface_name = "vlan." + vlan_tag
-
-        cmd_apv_config_virtual_iface = ADCDevice.cluster_config_virtual_interface(interface_name)
-        cmd_apv_config_virtual_vip = ADCDevice.cluster_config_vip(interface_name, vip_address)
-        cmd_apv_cluster_enable = ADCDevice.cluster_enable(interface_name)
-
-        cmd_avx_config_virtual_iface = "va run %s \"%s\"" % (va_name, cmd_apv_config_virtual_iface)
-        cmd_avx_config_virtual_vip = "va run %s \"%s\"" % (va_name, cmd_apv_config_virtual_vip)
-        cmd_avx_cluster_enable = "va run %s \"%s\"" % (va_name, cmd_apv_cluster_enable)
-
-        priority = 1
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_avx_config_virtual_iface)
+            self.run_cli_extend(base_rest_url, cmd_avx_config_virtual_interface)
             self.run_cli_extend(base_rest_url, cmd_avx_config_virtual_vip)
+            if is_master:
+                self.run_cli_extend(base_rest_url, cmd_avx_config_virtual_priority_99)
+                is_master = False
+            else:
+                self.run_cli_extend(base_rest_url, cmd_avx_config_virtual_priority_100)
+            self.run_cli_extend(base_rest_url, cmd_avx_enable_cluster)
 
-            priority += 10
-            cmd_apv_config_virtual_prior = ADCDevice.cluster_config_priority(interface_name, priority)
-            cmd_avx_config_cluster_prior = "va run %s \"%s\"" % (va_name, cmd_apv_config_virtual_prior)
-            self.run_cli_extend(base_rest_url, cmd_avx_config_cluster_prior)
 
-            self.run_cli_extend(base_rest_url, cmd_avx_cluster_enable)
+    def clear_cluster(self, va_name, vip_address, vlan_tag):
+        if len(self.hostnames) == 1:
+            LOG.debug("Only one machine, doesn't need to configure HA")
+            return True
+
+        interface_name = self.in_interface
+        if vlan_tag:
+            interface_name = "vlan." + vlan_tag
+        cluster_id = get_cluster_id_from_va_name(va_name)
+
+        cmd_no_config_virtual_vip = ADCDevice.no_cluster_config_vip(interface_name, cluster_id, vip_address)
+        cmd_avx_no_config_virtual_vip = "va run %s \"%s\"" % (va_name, cmd_no_config_virtual_vip)
+
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_avx_no_config_virtual_vip)
 
 
     def get_cached_map(self, argu):

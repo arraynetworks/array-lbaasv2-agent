@@ -31,3 +31,13 @@ def service_group_lb_method(method, session_persistence=None):
     }
 
     return lb_methods.get((session_persistence, method), 'rr')
+
+
+def array_protocol_map(protocol):
+    protocol_map = {
+        lb_const.PROTOCOL_TCP: lb_const.PROTOCOL_TCP,
+        lb_const.PROTOCOL_HTTPS: lb_const.PROTOCOL_TCP,
+        lb_const.PROTOCOL_HTTP: lb_const.PROTOCOL_HTTP,
+        lb_const.PROTOCOL_TERMINATED_HTTPS: lb_const.PROTOCOL_HTTPS,
+    }
+    return protocol_map.get(protocol, lb_const.PROTOCOL_TCP)
