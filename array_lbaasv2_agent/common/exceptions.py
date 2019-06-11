@@ -15,7 +15,11 @@
 import errno
 import inspect
 import logging
-from neutron_lib import exceptions as q_exception
+try:
+    from neutron_lib import exceptions as q_exception
+except Exception:
+    from neutron.common import exceptions as q_exception
+
 import syslog
 import traceback
 
@@ -77,16 +81,7 @@ class ArrayMissingDependencies(ArrayAgentException):
                                               frame.filename, frame.lineno)
 
 
-class ArrayNeutronException(q_exception.NeutronException):
-    pass
-
-class InvalidNetworkType(ArrayAgentException):
-    pass
-
-UNKNOWN_ERROR = -100
-CLI_ERROR = -101
-INVALID_SESSION_PERSISTENCE = -102
-INVALID_INSTANCE_STATE = -103
+UNKNOWN_ERROR = 100
 
 class ArrayADCException(q_exception.NeutronException):
 
@@ -98,18 +93,6 @@ class ArrayADCException(q_exception.NeutronException):
         super(ArrayADCException, self).__init__(errstr = errstr, errno = errno)
         self.errno = errno
 
-class CliError(ArrayADCException):
-    def __init__(self):
-        super(CliError, self).__init__("Failed to run CLI",
-                                       self.CLI_ERROR)
+class TimeOutException(ArrayADCException):
 
-class InvalidSessionPersistence(ArrayADCException):
-    def __init__(self):
-        super(InvalidSessionPersistence, self).__init__("Invalid session persistence",
-                                                        self.INVALID_SESSION_PERSISTENCE)
-
-class DeferDeployInstance(ArrayADCException):
-    def __init__(self):
-        super(DeferDeployInstance, self).__init__("Defer to deploy instance",
-                                                  self.DEFER_DEPLOY)
-
+    message = "Timeout exception."

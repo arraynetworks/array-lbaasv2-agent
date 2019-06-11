@@ -77,7 +77,8 @@ class ArrayADCDriver(object):
                 self.hosts,
                 self.conf.arraynetworks.array_interfaces,
                 self.conf.arraynetworks.array_api_user,
-                self.conf.arraynetworks.array_api_password)
+                self.conf.arraynetworks.array_api_password,
+                self.context)
             return
         except ImportError as ie:
             msg = ('Error importing loadbalancer device driver: %s error %s'
@@ -135,6 +136,7 @@ class ArrayADCDriver(object):
                 interface_mapping[host] = interfaces
         argu['interface_mapping'] = interface_mapping
 
+        argu['subnet_id'] = lb['vip_subnet_id']
         argu['tenant_id'] = lb['tenant_id']
         argu['vip_id'] = lb['id']
         argu['vip_address'] = lb['vip_address']
