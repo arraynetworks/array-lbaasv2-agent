@@ -226,3 +226,58 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
     @log_helpers.log_method_call
     def update_loadbalancer_stats(self, context, obj):
         pass
+
+    @log_helpers.log_method_call
+    def create_l7rule(self, context, obj):
+        try:
+            self.driver.create_l7rule(obj)
+            self.plugin_rpc.l7rule_successful_completion(context, obj)
+        except ArrayADCException as e:
+            LOG.exception('could not create l7rule: %s', e.msg)
+            self.plugin_rpc.l7rule_failed_completion(context, obj)
+
+    @log_helpers.log_method_call
+    def update_l7rule(self, context, obj, old_obj):
+        try:
+            self.driver.update_l7rule(obj, old_obj)
+            self.plugin_rpc.l7rule_successful_completion(context, obj)
+        except ArrayADCException as e:
+            LOG.exception('could not update l7rule: %s, %s', obj['id'], e.msg)
+            self.plugin_rpc.l7rule_failed_completion(context, obj)
+
+    @log_helpers.log_method_call
+    def delete_l7rule(self, context, obj):
+        try:
+            self.driver.delete_l7rule(obj)
+            self.plugin_rpc.l7rule_deleting_completion(context, obj)
+        except ArrayADCException as e:
+            LOG.exception('could not delete l7rule: %s, %s', obj['id'], e.msg)
+            self.plugin_rpc.l7rule_failed_completion(context, obj)
+
+    @log_helpers.log_method_call
+    def create_l7policy(self, context, obj):
+        try:
+            self.driver.create_l7policy(obj)
+            self.plugin_rpc.l7policy_successful_completion(context, obj)
+        except ArrayADCException as e:
+            LOG.exception('could not create l7policy: %s', e.msg)
+            self.plugin_rpc.l7policy_failed_completion(context, obj)
+
+    @log_helpers.log_method_call
+    def update_l7policy(self, context, obj, old_obj):
+        try:
+            self.driver.update_l7policy(obj, old_obj)
+            self.plugin_rpc.l7policy_successful_completion(context, obj)
+        except ArrayADCException as e:
+            LOG.exception('could not update l7policy: %s, %s', obj['id'], e.msg)
+            self.plugin_rpc.l7policy_failed_completion(context, obj)
+
+    @log_helpers.log_method_call
+    def delete_l7policy(self, context, obj):
+        try:
+            self.driver.delete_l7policy(obj)
+            self.plugin_rpc.l7policy_deleting_completion(context, obj)
+        except ArrayADCException as e:
+            LOG.exception('could not delete l7policy: %s, %s', obj['id'], e.msg)
+            self.plugin_rpc.l7policy_failed_completion(context, obj)
+

@@ -81,6 +81,30 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'member_deleting_completion', obj=obj)
 
+    def l7rule_successful_completion(self, context, obj):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'l7rule_successful_completion', obj=obj)
+
+    def l7rule_failed_completion(self, context, obj):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'l7rule_failed_completion', obj=obj)
+
+    def l7rule_deleting_completion(self, context, obj):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'l7rule_deleting_completion', obj=obj)
+
+    def l7policy_successful_completion(self, context, obj):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'l7policy_successful_completion', obj=obj)
+
+    def l7policy_failed_completion(self, context, obj):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'l7policy_failed_completion', obj=obj)
+
+    def l7policy_deleting_completion(self, context, obj):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'l7policy_deleting_completion', obj=obj)
+
     def hm_successful_completion(self, context, obj):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'hm_successful_completion', obj=obj)
