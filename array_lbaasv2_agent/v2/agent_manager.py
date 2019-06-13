@@ -15,6 +15,7 @@ from oslo_config import cfg
 from oslo_log import helpers as log_helpers
 import logging
 import oslo_messaging
+import uuid
 
 try:
     from neutron import context
@@ -47,7 +48,15 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         self.conf = conf
 
         self.context = context.get_admin_context_without_session()
-        self.agent_host = conf.host
+
+        self.agent_host = None
+        if self.conf.agent_id:
+            self.agent_host = self.conf.agent_id
+            LOG.debug('setting agent host to %s' % self.agent_host)
+        else:
+            agent_hash = str(uuid.uuid1())
+            self.agent_host = conf.host + ":" + agent_hash
+            LOG.debug('setting agent host to %s' % self.agent_host)
 
         ## callback to plugin
         self._setup_plugin_rpc()

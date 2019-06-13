@@ -379,3 +379,22 @@ class ArrayADCDriver(object):
         argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.delete_health_monitor(argu)
 
+    def create_l7rule(self, obj):
+        pass
+
+    def update_l7rule(self, obj, old_obj):
+        pass
+
+    def delete_l7rule(self, obj):
+        pass
+
+    def create_l7policy(self, obj):
+        pass
+
+    def update_l7policy(self, obj, old_obj):
+        pass
+
+    def delete_l7policy(self, obj):
+        pass
+
+
