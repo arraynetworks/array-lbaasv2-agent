@@ -54,6 +54,10 @@ OPTS = [
 cfg.CONF.register_opts(OPTS, 'arraynetworks')
 
 
+def get_vlinks_by_policy(policy_id):
+    return [policy_id + "_v" + str(idx) for idx in range(1, 3)]
+
+
 class ArrayADCDriver(object):
     """ The implementation on host to push config to
         APV/AVX instance via RESTful API
@@ -379,22 +383,189 @@ class ArrayADCDriver(object):
         argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.delete_health_monitor(argu)
 
-    def create_l7rule(self, obj):
-        pass
+    def create_l7rule(self, rule):
+        argu = {}
+        policy = rule.policy
 
-    def update_l7rule(self, obj, old_obj):
-        pass
+        LOG.debug("Delete all rules from policy in create_l7_rule")
+        self.delete_all_rules(policy)
+        LOG.debug("Create all rules from policy in create_l7_rule")
+        self.create_all_rules(policy)
+        self.driver.write_memory(argu)
 
-    def delete_l7rule(self, obj):
-        pass
 
-    def create_l7policy(self, obj):
-        pass
+    def update_l7rule(self, rule, old_rule):
+        need_recreate = False
+        policy_changed = False
+        for changed in ('type', 'compare_type', 'l7policy_id', 'key', 'value'):
+            if rule[changed] != old_rule[changed]:
+                need_recreate = True
 
-    def update_l7policy(self, obj, old_obj):
-        pass
+        if not need_recreate:
+            LOG.debug("It doesn't need do any thing(update_l7_rule)")
+            return
 
-    def delete_l7policy(self, obj):
-        pass
+        if rule['l7policy_id'] != old_rule['l7policy_id']:
+            policy_changed = True
+
+        old_policy = old_rule['policy']
+        policy = rule['policy']
+        if policy_changed:
+            LOG.debug("Delete all rules from old policy in update_l7_rule")
+            self.delete_all_rules(old_policy)
+            LOG.debug("Delete all rules from new policy in update_l7_rule")
+            self.delete_all_rules(policy)
+
+            LOG.debug("Create all rules from old policy in update_l7_rule")
+            self.create_all_rules(policy, filt=rule['id'])
+            LOG.debug("Create all rules from new policy in update_l7_rule")
+            self.create_all_rules(policy)
+
+    def delete_l7rule(self, rule):
+        argu = {}
+        policy = rule['policy']
+
+        LOG.debug("Delete all rules from policy in delete_l7_rule")
+        self.delete_all_rules(policy)
+        LOG.debug("Create all rules from policy in delete_l7_rule")
+        self.create_all_rules(policy, filt=rule.id)
+        self.driver.write_memory(argu)
+
+
+    def create_l7policy(self, policy, updated=False):
+        argu = {}
+
+        argu['action'] = policy['action']
+        argu['id'] = policy['id']
+        argu['listener_id'] = policy['listener_id']
+        argu['pool_id'] = policy['redirect_pool_id']
+        argu['position'] = policy['position']
+        argu['redirect_url'] = policy['redirect_url']
+
+        sp_type = None
+        ck_name = None
+        pool = policy['redirect_pool']
+        if pool:
+            if pool['session_persistence']:
+                sp_type = pool['session_persistence']['type']
+                ck_name = pool['session_persistence']['cookie_name']
+            argu['session_persistence_type'] = sp_type
+            argu['cookie_name'] = ck_name
+            argu['lb_algorithm'] = pool['lb_algorithm']
+
+        self.driver.create_l7_policy(argu, updated=updated)
+        if not updated:
+            self.driver.write_memory(argu)
+
+
+    def update_l7policy(self, policy, old_policy):
+        need_recreate = False
+        for changed in ('action', 'redirect_pool_id', 'redirect_url'):
+            if policy[changed] != old_policy[changed]:
+                need_recreate = True
+
+        if not need_recreate:
+            LOG.debug("It doesn't need do any thing(update_l7_policy)")
+            return
+
+        argu = {}
+        self.delete_l7policy(old_policy, updated=True)
+        self.create_l7policy(policy, updated=True)
+
+        self.create_all_rules(policy)
+        self.driver.write_memory(argu)
+
+
+    def delete_l7policy(self, policy, updated=False):
+        argu = {}
+        argu['action'] = policy['action']
+        argu['id'] = policy['id']
+        argu['listener_id'] = policy['listener_id']
+        argu['pool_id'] = policy['redirect_pool_id']
+
+        sp_type = None
+        pool = policy['redirect_pool']
+        if pool:
+            pool = policy['redirect_pool']
+            if pool['session_persistence']:
+                sp_type = pool['session_persistence']['type']
+            argu['session_persistence_type'] = sp_type
+            argu['lb_algorithm'] = pool['lb_algorithm']
+
+        LOG.debug("Delete all rules from policy in delete_l7_policy")
+        self.delete_all_rules(policy)
+
+        self.driver.delete_l7_policy(argu, updated=updated)
+        if not updated:
+            self.driver.write_memory(argu)
+
+
+    def delete_all_rules(self, policy):
+        argu = {}
+        rules = policy['rules']
+
+        for rule in rules:
+            argu['rule_type'] = rule['type']
+            argu['rule_id'] = rule['id']
+            self.driver.delete_l7_rule(argu)
+
+    def create_all_rules(self, policy, filt = None):
+        argu = {}
+        rules = policy['rules']
+
+        idx = 0
+        cnt = len(rules)
+        if filt:
+            for rule in rules:
+                if rule['id'] == filt:
+                    break
+                idx += 1
+            if cnt > idx:
+                del rules[idx]
+                cnt -= 1
+
+        argu['vs_id'] = policy['listener_id']
+        if policy['redirect_pool']:
+            argu['group_id'] = policy['redirect_pool']['id']
+        else:
+            argu['group_id'] = policy['listener']['default_pool_id']
+
+        if cnt == 0:
+            LOG.debug("No any rule needs to be created.")
+        elif cnt == 1:
+            rule = rules[0]
+            argu['rule_type'] = rule['type']
+            argu['compare_type'] = rule['compare_type']
+            argu['rule_id'] = rule['id']
+            argu['rule_value'] = rule['value']
+            argu['rule_key'] = rule['key']
+            self.driver.create_l7_rule(argu)
+        elif cnt == 2 or cnt == 3:
+            vlinks = get_vlinks_by_policy(policy['id'])
+            for rule_idx in range(cnt):
+                rule = rules[rule_idx]
+
+                argu['rule_type'] = rule['type']
+                argu['compare_type'] = rule['compare_type']
+                argu['rule_id'] = rule['id']
+                argu['rule_value'] = rule['value']
+                argu['rule_key'] = rule['key']
+                if rule_idx == 0:
+                    argu['group_id'] = vlinks[0]
+                elif rule_idx == (cnt - 1):
+                    if policy['redirect_pool']:
+                        argu['group_id'] = policy['redirect_pool']['id']
+                    else:
+                        argu['group_id'] = policy['listener']['default_pool_id']
+                    if cnt == 2:
+                        argu['vs_id'] = vlinks[0];
+                    else:
+                        argu['vs_id'] = vlinks[1];
+                else:
+                    argu['group_id'] = vlinks[1]
+                    argu['vs_id'] = vlinks[0];
+                self.driver.create_l7_rule(argu)
+        else:
+            LOG.debug("It doesn't support to create more than three rule in one policy.")
 
 
