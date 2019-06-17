@@ -94,5 +94,8 @@ class ArrayLBaaSv2Repository(BaseRepository):
             return vapv.hostname
         return None
 
+    def get_vas(self, session):
+        vapvs = session.query(self.model_class).all()
+        return [vapv.hostname for vapv in vapvs]
 
 

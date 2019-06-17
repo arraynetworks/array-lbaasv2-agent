@@ -27,7 +27,21 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
         self.hostnames = management_ip
         self.context = context
         self.base_rest_urls = ["https://" + host + ":9997/rest/avx" for host in self.hostnames]
+        self.vapv_names = []
+        self._init_vapv_names()
 
+    def _init_vapv_names(self):
+        for interface in self.in_interface:
+            for i in range(1, 33):
+                va_name = "%s_va%02d" % (interface, i)
+                self.vapv_names.append(va_name)
+
+    def allocate_va(self):
+        exist_vapvs = self.array_db.get_vas()
+        diff_vas = list(set(exist_vapvs).difference(set(self.vapv_names)))
+        if len(diff_vas) > 1:
+            return diff_vas[0]
+        return None
 
     def get_va_name(self, argu):
         if not argu:
@@ -41,8 +55,11 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
 
         va_name = self.array_db.get_va_by_lb_id(self.context.session, vip_id)
         if not va_name:
-            msg = "Cannot get the vAPV by vip_id(%s)" % vip_id
-            raise ArrayADCException(msg)
+            LOG.debug("Will allocate the va from pools")
+            va_name = self.allocate_va()
+            if not va_name:
+                msg = "Failed to allocate the vAPV(%s)" % vip_id
+                raise ArrayADCException(msg)
         return va_name
 
     def get_va_interface(self):
