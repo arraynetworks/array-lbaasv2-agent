@@ -32,10 +32,9 @@ python setup.py install
 %{python2_sitelib}/array_lbaasv2_agent
 %{python2_sitelib}/*.egg-info
 /usr/bin/array-lbaasv2-agent
+/usr/bin/array_lbaas_init_db
 /usr/lib/systemd/system/array-lbaasv2-agent.service
 /etc/neutron/conf.d/neutron-server/arraynetworks.conf
-%attr(0777,root,root) %{_datadir}/array_lbaasv2_agent/mapping_apv.json
-%attr(0777,root,root) %{_datadir}/array_lbaasv2_agent/mapping_avx.json
 
 %changelog
 * Thu Oct 25 2018 jarod.w <wangli2@arraynetworks.com.cn> 1.0.0-1

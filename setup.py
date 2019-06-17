@@ -2,17 +2,6 @@
 # flake8: noqa
 
 from setuptools import setup, find_packages
-from setuptools.command.install import install
-import os
-
-ARRAY_MAPPING_APV = '/usr/share/array_lbaasv2_agent/mapping_apv.json'
-ARRAY_MAPPING_AVX = '/usr/share/array_lbaasv2_agent/mapping_avx.json'
-
-class PostInstallCommand(install):
-    def run(self):
-        install.run(self)
-        os.chmod(ARRAY_MAPPING_APV, 0777)
-        os.chmod(ARRAY_MAPPING_AVX, 0777)
 
 setup(
     name = "array-lbaasv2-agent",
@@ -28,7 +17,7 @@ setup(
 
     data_files=[('/etc/neutron/conf.d/neutron-server', ['etc/neutron/conf.d/neutron-server/arraynetworks.conf']),
                 ('/usr/lib/systemd/system/', ['etc/systemd/array-lbaasv2-agent.service']),
-                ('/usr/share/array_lbaasv2_agent/', ['conf/mapping_apv.json', 'conf/mapping_avx.json']),],
+                ('/usr/bin/array_lbaas_init_db', ['scripts/array_lbaas_init_db']), ],
 
     classifiers = [
         'License :: OSI Approved :: Apache Software License',
@@ -38,10 +27,6 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Topic :: Internet',
     ],
-
-    cmdclass={
-        'install': PostInstallCommand,
-    },
 
     entry_points={
         'console_scripts': [
