@@ -23,10 +23,13 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     """ The real implementation on host to push config to
         APV via RESTful API
     """
-    def __init__(self, management_ip, in_interface, user_name, user_passwd, context):
-        super(ArrayAPVAPIDriver, self).__init__(in_interface, user_name, user_passwd, context)
+    def __init__(self, management_ip, in_interface, user_name, user_passwd, context, plugin_rpc):
+        super(ArrayAPVAPIDriver, self).__init__(in_interface,
+                                                user_name,
+                                                user_passwd,
+                                                context,
+                                                plugin_rpc)
         self.hostnames = management_ip
-        self.context = context
         self.base_rest_urls = ["https://" + host + ":9997/rest/apv" for host in self.hostnames]
 
     def get_va_name(self, argu):

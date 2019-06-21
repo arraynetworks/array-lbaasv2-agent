@@ -148,3 +148,22 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vlan_id_by_port_cmcc', port_id=port_id)
 
+    def generate_vapv(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'generate_vapv')
+
+    def get_vapv_by_lb_id(self, context, vip_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_vapv_by_lb_id', vip_id=vip_id)
+
+    def create_vapv(self, context, vapv_name, lb_id, subnet_id, in_use_lb):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'create_vapv', vapv_name=vapv_name,
+                          lb_id=lb_id, subnet_id=subnet_id,
+                          in_use_lb=in_use_lb)
+
+    def delete_vapv(self, context, vapv_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'delete_vapv', vapv_name=vapv_name)
+
+

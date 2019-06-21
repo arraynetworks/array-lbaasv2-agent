@@ -22,10 +22,13 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
     """ The real implementation on host to push config to
         vAPV instance of AVX via RESTful API
     """
-    def __init__(self, management_ip, in_interface, user_name, user_passwd, context):
-        super(ArrayAVXAPIDriver, self).__init__(in_interface, user_name, user_passwd, context)
+    def __init__(self, management_ip, in_interface, user_name, user_passwd, context, plugin_rpc):
+        super(ArrayAVXAPIDriver, self).__init__(in_interface,
+                                                user_name,
+                                                user_passwd,
+                                                context,
+                                                plugin_rpc)
         self.hostnames = management_ip
-        self.context = context
         self.base_rest_urls = ["https://" + host + ":9997/rest/avx" for host in self.hostnames]
         self.vapv_names = []
         self._init_vapv_names()
@@ -37,7 +40,7 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
                 self.vapv_names.append(va_name)
 
     def allocate_va(self):
-        exist_vapvs = self.array_db.get_vas()
+        exist_vapvs = self.plugin_rpc.get_all_vapvs(self.context)
         diff_vas = list(set(exist_vapvs).difference(set(self.vapv_names)))
         if len(diff_vas) > 1:
             return diff_vas[0]
@@ -53,15 +56,16 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
             msg = "No loadbalance_id in argument, raise it"
             raise ArrayADCException(msg)
 
-        va_name = self.array_db.get_va_by_lb_id(self.context.session, vip_id)
-        if not va_name:
+        ret_vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, vip_id)
+        if not ret_vapv:
             LOG.debug("Will allocate the va from pools")
-            va_name = self.allocate_va()
-            if not va_name:
+            ret_vapv = self.plugin_rpc.generate_vapv(self.context)
+            if not ret_vapv:
                 msg = "Failed to allocate the vAPV(%s)" % vip_id
                 raise ArrayADCException(msg)
+        va_name = ret_vapv['vapv_name']
         return va_name
 
     def get_va_interface(self):
-        return "port2"
+        return "port1"
 

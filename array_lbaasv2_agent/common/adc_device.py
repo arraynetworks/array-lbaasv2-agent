@@ -356,7 +356,7 @@ class ADCDevice(object):
     @staticmethod
     def redirect_to_url(vs_name, policy_name, dest_url):
         (proto, host, path) = parse_dest_url(dest_url)
-        cmd = "http redirect url %s %s 1 \"<regex>.*\" \"<regex>.*\" \"%s\" \"%s\" \"%s\" 302" % \
+        cmd = "http redirect url %s %s 1 $$\<regex\>.*$$ $$\<regex\>.*$$ $$%s$$ $$%s$$ $$%s$$ 302" % \
                 (vs_name, policy_name, proto, host, path)
         return cmd
 
@@ -376,21 +376,21 @@ class ADCDevice(object):
             cmd = "slb policy qos url"
 
         if compare_type == lb_const.L7_RULE_COMPARE_TYPE_REGEX:
-            v_str = "<regex>%s" % value
+            v_str = "\<regex\>%s" % value
             if key:
-                v_key = "<regex>%s" % key
+                v_key = "\<regex\>%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_STARTS_WITH:
             v_str = "^%s" % value
             if key:
                 v_key = "^%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_ENDS_WITH:
-            v_str = "%s$" % value
+            v_str = "%s$ " % value
             if key:
-                v_key = "%s$" % key
+                v_key = "%s$ " % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_EQUAL_TO:
-            v_str = "^%s$" % value
+            v_str = "^%s$ " % value
             if key:
-                v_key = "^%s$" % key
+                v_key = "^%s$ " % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
             v_str = value
             if key:
@@ -401,7 +401,7 @@ class ADCDevice(object):
         elif rule_type == lb_const.L7_RULE_TYPE_FILE_TYPE:
             v_str = "\.%s$" % value
 
-        cmd += " %s %s %s \"%s\" 1" % (rule_id, vs_id, group_id, v_str)
+        cmd += " %s %s %s $$%s$$ 1" % (rule_id, vs_id, group_id, v_str)
         return cmd
 
     @staticmethod

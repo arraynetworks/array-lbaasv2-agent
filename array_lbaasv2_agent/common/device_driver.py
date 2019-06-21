@@ -82,7 +82,8 @@ class ArrayADCDriver(object):
                 self.conf.arraynetworks.array_interfaces,
                 self.conf.arraynetworks.array_api_user,
                 self.conf.arraynetworks.array_api_password,
-                self.context)
+                self.context,
+                self.plugin_rpc)
             return
         except ImportError as ie:
             msg = ('Error importing loadbalancer device driver: %s error %s'
@@ -119,12 +120,13 @@ class ArrayADCDriver(object):
             network = self.plugin_rpc.get_network(self.context, subnet['network_id'])
             if PROV_NET_TYPE in network:
                 network_type = network[PROV_NET_TYPE]
-            if PROV_SEGMT_ID in network:
-                segment_id = network[PROV_SEGMT_ID]
-            if segment_id:
-                argu['vlan_tag'] = str(segment_id)
-            if network_type:
-                argu['network_type'] = network_type
+            if network_type == 'vlan':
+                if PROV_SEGMT_ID in network:
+                    segment_id = network[PROV_SEGMT_ID]
+                if segment_id:
+                    argu['vlan_tag'] = str(segment_id)
+                if network_type:
+                    argu['network_type'] = network_type
 
         interface_mapping = {}
         if len(self.hosts) > 1:
@@ -177,20 +179,20 @@ class ArrayADCDriver(object):
             network = self.plugin_rpc.get_network(self.context, lb['vip_port']['network_id'])
             if PROV_NET_TYPE in network:
                 network_type = network[PROV_NET_TYPE]
-            if PROV_SEGMT_ID in network:
-                segment_id = network[PROV_SEGMT_ID]
-            if segment_id:
-                argu['vlan_tag'] = str(segment_id)
-            if network_type:
-                argu['network_type'] = network_type
+            if 'vlan' == network_type:
+                if PROV_SEGMT_ID in network:
+                    segment_id = network[PROV_SEGMT_ID]
+                if segment_id:
+                    argu['vlan_tag'] = str(segment_id)
+                if network_type:
+                    argu['network_type'] = network_type
 
         if len(self.hosts) > 1:
             LOG.debug("Will delete the port created by ourselves.")
-            mapping = self.client.get_cached_map(argu)
-            if mapping:
-                for host in self.hosts:
-                    port_id = mapping[host]
-                    self.plugin_rpc.delete_port(self.context, port_id)
+            #TODO: delete the ha port
+            #for host in self.hosts:
+            #    port_id = mapping[host]
+            #    self.plugin_rpc.delete_port(self.context, port_id)
 
         self.driver.delete_loadbalancer(argu)
 
@@ -211,6 +213,21 @@ class ArrayADCDriver(object):
         argu['listener_id'] = listener['id']
         argu['vip_address'] = lb['vip_port']['fixed_ips'][0]['ip_address']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
+
+        pool = listener['default_pool']
+
+        if pool:
+            sp_type = None
+            ck_name = None
+            argu['pool_id'] = pool['id']
+            if pool['session_persistence']:
+                sp_type = pool['session_persistence']['type']
+                ck_name = pool['session_persistence']['cookie_name']
+            argu['lb_algorithm'] = pool['lb_algorithm']
+            argu['session_persistence_type'] = sp_type
+            argu['cookie_name'] = ck_name
+        else:
+            argu['pool_id'] = None
 
         self.driver.create_listener(argu)
 
@@ -237,6 +254,17 @@ class ArrayADCDriver(object):
         lb = listener['loadbalancer']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
 
+        pool = listener['default_pool']
+        if pool:
+            sp_type = None
+            argu['pool_id'] = pool['id']
+            if pool['session_persistence']:
+                sp_type = pool['session_persistence']['type']
+            argu['lb_algorithm'] = pool['lb_algorithm']
+            argu['session_persistence_type'] = sp_type
+        else:
+            argu['pool_id'] = None
+
         self.driver.delete_listener(argu)
 
 
@@ -253,13 +281,19 @@ class ArrayADCDriver(object):
 
         argu['tenant_id'] = pool['tenant_id']
         argu['pool_id'] = pool['id']
-        argu['listener_id'] = pool['listener']['id']
         argu['session_persistence_type'] = sp_type
         argu['cookie_name'] = ck_name
         argu['lb_algorithm'] = pool['lb_algorithm']
 
         lb = pool['loadbalancer']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
+
+        listener = pool['listener']
+        if listener:
+            argu['listener_id'] = listener['id']
+        else:
+            argu['listener_id'] = None
+
         self.driver.create_pool(argu)
 
 
@@ -301,13 +335,19 @@ class ArrayADCDriver(object):
 
         argu['tenant_id'] = pool['tenant_id']
         argu['pool_id'] = pool['id']
-        argu['listener_id'] = pool['listener']['id']
         argu['session_persistence_type'] = sp_type
         argu['cookie_name'] = ck_name
         argu['lb_algorithm'] = pool['lb_algorithm']
 
         lb = pool['loadbalancer']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
+
+        listener = pool['listener']
+        if listener:
+            argu['listener_id'] = listener['id']
+        else:
+            argu['listener_id'] = None
+
         self.driver.delete_pool(argu)
 
     def create_member(self, obj):
@@ -385,8 +425,9 @@ class ArrayADCDriver(object):
 
     def create_l7rule(self, rule):
         argu = {}
-        policy = rule.policy
+        policy = rule['policy']
 
+        argu['vip_id'] = policy['listener']['loadbalancer_id']
         LOG.debug("Delete all rules from policy in create_l7_rule")
         self.delete_all_rules(policy)
         LOG.debug("Create all rules from policy in create_l7_rule")
@@ -395,6 +436,7 @@ class ArrayADCDriver(object):
 
 
     def update_l7rule(self, rule, old_rule):
+        argu = {}
         need_recreate = False
         policy_changed = False
         for changed in ('type', 'compare_type', 'l7policy_id', 'key', 'value'):
@@ -420,27 +462,32 @@ class ArrayADCDriver(object):
             self.create_all_rules(policy, filt=rule['id'])
             LOG.debug("Create all rules from new policy in update_l7_rule")
             self.create_all_rules(policy)
+            argu['vip_id'] = policy['listener']['loadbalancer_id']
+            self.driver.write_memory(argu)
 
     def delete_l7rule(self, rule):
         argu = {}
         policy = rule['policy']
 
+        argu['vip_id'] = policy['listener']['loadbalancer_id']
         LOG.debug("Delete all rules from policy in delete_l7_rule")
         self.delete_all_rules(policy)
         LOG.debug("Create all rules from policy in delete_l7_rule")
-        self.create_all_rules(policy, filt=rule.id)
+        self.create_all_rules(policy, filt=rule['id'])
         self.driver.write_memory(argu)
 
 
     def create_l7policy(self, policy, updated=False):
         argu = {}
 
+        listener = policy['listener']
         argu['action'] = policy['action']
         argu['id'] = policy['id']
         argu['listener_id'] = policy['listener_id']
         argu['pool_id'] = policy['redirect_pool_id']
         argu['position'] = policy['position']
         argu['redirect_url'] = policy['redirect_url']
+        argu['vip_id'] = listener['loadbalancer_id']
 
         sp_type = None
         ck_name = None
@@ -469,6 +516,7 @@ class ArrayADCDriver(object):
             return
 
         argu = {}
+        argu['vip_id'] = policy['listener']['loadbalancer_id']
         self.delete_l7policy(old_policy, updated=True)
         self.create_l7policy(policy, updated=True)
 
@@ -478,10 +526,12 @@ class ArrayADCDriver(object):
 
     def delete_l7policy(self, policy, updated=False):
         argu = {}
+        listener = policy['listener']
         argu['action'] = policy['action']
         argu['id'] = policy['id']
         argu['listener_id'] = policy['listener_id']
         argu['pool_id'] = policy['redirect_pool_id']
+        argu['vip_id'] = listener['loadbalancer_id']
 
         sp_type = None
         pool = policy['redirect_pool']
@@ -503,7 +553,9 @@ class ArrayADCDriver(object):
     def delete_all_rules(self, policy):
         argu = {}
         rules = policy['rules']
+        listener = policy['listener']
 
+        argu['vip_id'] = listener['loadbalancer_id']
         for rule in rules:
             argu['rule_type'] = rule['type']
             argu['rule_id'] = rule['id']
@@ -512,6 +564,7 @@ class ArrayADCDriver(object):
     def create_all_rules(self, policy, filt = None):
         argu = {}
         rules = policy['rules']
+        listener = policy['listener']
 
         idx = 0
         cnt = len(rules)
@@ -524,6 +577,7 @@ class ArrayADCDriver(object):
                 del rules[idx]
                 cnt -= 1
 
+        argu['vip_id'] = listener['loadbalancer_id']
         argu['vs_id'] = policy['listener_id']
         if policy['redirect_pool']:
             argu['group_id'] = policy['redirect_pool']['id']

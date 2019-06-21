@@ -19,7 +19,6 @@ import requests
 from oslo_log import log as logging
 from neutron_lbaas.services.loadbalancer import constants as lb_const
 from array_lbaasv2_agent.common.adc_device import ADCDevice
-from array_lbaasv2_agent.db.repository import ArrayLBaaSv2Repository
 from array_lbaasv2_agent.common import exceptions as driver_except
 
 LOG = logging.getLogger(__name__)
@@ -39,12 +38,12 @@ class ArrayCommonAPIDriver(object):
         Array appliance instance via RESTful API
     """
 
-    def __init__(self, in_interface, user_name, user_passwd, context):
+    def __init__(self, in_interface, user_name, user_passwd, context, plugin_rpc):
         self.user_name = user_name
         self.user_passwd = user_passwd
         self.in_interface = in_interface
         self.context = context
-        self.array_db = ArrayLBaaSv2Repository()
+        self.plugin_rpc = plugin_rpc
 
 
     def get_auth(self):
@@ -59,16 +58,12 @@ class ArrayCommonAPIDriver(object):
 
         va_name = self.get_va_name(argu)
         # create vip
-        self._create_vip(argu['vip_address'], argu['netmask'], argu['gateway'],
-                         argu['vlan_tag'], va_name)
+        self._create_vip(argu['vip_address'], argu['netmask'], argu['vlan_tag'],
+                         va_name)
 
         #TODO: should configure HA
-
-        # add the apv into database
-        self.create_vapv(self.context, subnet_id = argu['subnet_id'],
-                         lb_id = argu['vip_id'], hostname = va_name,
-                         in_use_lb = 1)
-
+        self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
+                                    argu['subnet_id'], in_use_lb = 1)
 
     def delete_loadbalancer(self, argu):
         """ Delete a loadbalancer """
@@ -82,7 +77,7 @@ class ArrayCommonAPIDriver(object):
         # TODO: should clear the HA configuration
 
         # Delete the apv from database
-        self.array_amphora_db.delete(self.context.session, hostname=va_name)
+        self.plugin_rpc.delete_vapv(self.context, va_name)
 
     def create_listener(self, argu):
         """ create a listener """
@@ -117,7 +112,7 @@ class ArrayCommonAPIDriver(object):
                                 argu['lb_algorithm'], va_name)
 
 
-    def _create_vip(self, vip_address, netmask, gateway, vlan_tag, va_name):
+    def _create_vip(self, vip_address, netmask, vlan_tag, va_name):
         """ create vip"""
 
         cmd_apv_config_vlan = None
@@ -130,14 +125,10 @@ class ArrayCommonAPIDriver(object):
             cmd_apv_config_vlan = ADCDevice.vlan_device(in_interface, interface_name, vlan_tag)
 
         cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
-        cmd_apv_clear_route = ADCDevice.clear_route()
-        cmd_apv_configure_route = ADCDevice.configure_route(gateway)
         for base_rest_url in self.base_rest_urls:
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
             self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
-            self.run_cli_extend(base_rest_url, cmd_apv_clear_route, va_name)
-            self.run_cli_extend(base_rest_url, cmd_apv_configure_route, va_name)
 
 
     def _delete_vip(self, vlan_tag, va_name):
@@ -247,11 +238,8 @@ class ArrayCommonAPIDriver(object):
         va_name = self.get_va_name(argu)
         # delete policy
         if argu['listener_id']:
-            self._delete_policy(
-                               argu['listener_id'],
-                               argu['session_persistence_type'],
-                               argu['lb_algorithm']
-                               )
+            self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
+                                argu['lb_algorithm'], va_name)
 
         cmd_apv_no_group = ADCDevice.no_group(argu['pool_id'])
         for base_rest_url in self.base_rest_urls:
@@ -368,7 +356,7 @@ class ArrayCommonAPIDriver(object):
             for vlink in vlinks:
                 cmd_create_vlink = ADCDevice.create_vlink(vlink)
                 for base_rest_url in self.base_rest_urls:
-                    self.run_cli_extend(base_rest_url, cmd_create_vlink)
+                    self.run_cli_extend(base_rest_url, cmd_create_vlink, va_name)
 
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_create_group, va_name)
@@ -383,11 +371,8 @@ class ArrayCommonAPIDriver(object):
 
         va_name = self.get_va_name(argu)
         if argu['pool_id']:
-            self._delete_policy(
-                               argu['listener_id'],
-                               argu['session_persistence_type'],
-                               argu['lb_algorithm']
-                               )
+            self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
+                                argu['lb_algorithm'], va_name)
 
         cmd_no_group = None
         cmd_no_redirect_to_url = None
@@ -525,7 +510,7 @@ class ArrayCommonAPIDriver(object):
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
-        conn_max_retries = 60
+        conn_max_retries = 6
         conn_retry_interval = 10
         for a in six.moves.xrange(conn_max_retries):
             try:
@@ -554,6 +539,6 @@ class ArrayCommonAPIDriver(object):
 
 
     def create_vapv(self, context, **model_kwargs):
-        vapv = self.array_db.create(context.session, **model_kwargs);
+        vapv = self.plugin_rpc.create_vapv(context, **model_kwargs);
         return vapv
 

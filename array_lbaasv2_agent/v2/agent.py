@@ -50,7 +50,11 @@ OPTS = [
         'periodic_interval',
         default=10,
         help='Seconds between periodic task runs'
-    )
+    ),
+    cfg.StrOpt(
+        'agent_id',
+        help='agent id that should be uuid'
+    ),
 ]
 
 
