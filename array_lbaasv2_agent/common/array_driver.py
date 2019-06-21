@@ -405,6 +405,7 @@ class ArrayCommonAPIDriver(object):
                                                    argu['rule_type'],
                                                    argu['compare_type'],
                                                    argu['rule_value'],
+                                                   argu['rule_invert'],
                                                    argu['rule_key'])
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_create_rule, va_name)

@@ -579,6 +579,7 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = listener['loadbalancer_id']
         argu['vs_id'] = policy['listener_id']
+        argu['rule_invert'] = rule['invert']
         if policy['redirect_pool']:
             argu['group_id'] = policy['redirect_pool']['id']
         else:

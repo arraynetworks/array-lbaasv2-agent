@@ -362,7 +362,7 @@ class ADCDevice(object):
 
     @staticmethod
     def create_l7_rule(rule_id, vs_id, group_id, rule_type, compare_type,
-            value, key=None):
+            value, invert, key=None):
         cmd = ""
         v_str = ""
         if rule_type == lb_const.L7_RULE_TYPE_HOST_NAME:
@@ -400,6 +400,9 @@ class ADCDevice(object):
             v_str = "%s=%s" % (v_key, value)
         elif rule_type == lb_const.L7_RULE_TYPE_FILE_TYPE:
             v_str = "\.%s$" % value
+
+        if invert:
+            v_str = "!%s" % v_str
 
         cmd += " %s %s %s $$%s$$ 1" % (rule_id, vs_id, group_id, v_str)
         return cmd
