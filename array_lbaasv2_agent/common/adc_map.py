@@ -36,7 +36,7 @@ def service_group_lb_method(method, session_persistence=None):
 def array_protocol_map(protocol):
     protocol_map = {
         lb_const.PROTOCOL_TCP: lb_const.PROTOCOL_TCP,
-        lb_const.PROTOCOL_HTTPS: lb_const.PROTOCOL_TCP,
+        lb_const.PROTOCOL_HTTPS: "tcps",
         lb_const.PROTOCOL_HTTP: lb_const.PROTOCOL_HTTP,
         lb_const.PROTOCOL_TERMINATED_HTTPS: lb_const.PROTOCOL_HTTPS,
     }

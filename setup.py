@@ -16,8 +16,7 @@ setup(
     url = "http://www.arraynetworks.com.cn",
 
     data_files=[('/etc/neutron/conf.d/neutron-server', ['etc/neutron/conf.d/neutron-server/arraynetworks.conf']),
-                ('/usr/lib/systemd/system/', ['etc/systemd/array-lbaasv2-agent.service']),
-                ('/usr/bin/', ['scripts/array_lbaas_init_db']), ],
+                ('/usr/lib/systemd/system/', ['etc/systemd/array-lbaasv2-agent.service']), ],
 
     classifiers = [
         'License :: OSI Approved :: Apache Software License',

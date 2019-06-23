@@ -32,7 +32,6 @@ python setup.py install
 %{python2_sitelib}/array_lbaasv2_agent
 %{python2_sitelib}/*.egg-info
 /usr/bin/array-lbaasv2-agent
-/usr/bin/array_lbaas_init_db
 /usr/lib/systemd/system/array-lbaasv2-agent.service
 /etc/neutron/conf.d/neutron-server/arraynetworks.conf
 
