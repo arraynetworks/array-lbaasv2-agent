@@ -31,7 +31,6 @@ python setup.py install
 %license LICENSE
 %{python2_sitelib}/array_lbaasv2_agent
 %{python2_sitelib}/*.egg-info
-/usr/bin/array-lbaasv2-agent
 /usr/lib/systemd/system/array-lbaasv2-agent.service
 /etc/neutron/conf.d/neutron-server/arraynetworks.conf
 
