@@ -264,7 +264,7 @@ class ADCDevice(object):
             hm_type = 'ICMP'
         cmd = None
         if hm_type == 'HTTP' or hm_type == 'HTTPS':
-            cmd = "slb health %s %s %s %s 3 %s %s $$%s$$ $$%s$$" % (hm_name, hm_type.lower(), \
+            cmd = "slb health %s %s %s %s 3 %s %s @@%s@@ @@%s@@" % (hm_name, hm_type.lower(), \
                     str(hm_delay), str(hm_timeout), str(hm_max_retries), \
                     hm_http_method, hm_url, str(hm_expected_codes))
         else:
@@ -356,7 +356,7 @@ class ADCDevice(object):
     @staticmethod
     def redirect_to_url(vs_name, policy_name, dest_url):
         (proto, host, path) = parse_dest_url(dest_url)
-        cmd = "http redirect url %s %s 1 $$\<regex\>.*$$ $$\<regex\>.*$$ $$%s$$ $$%s$$ $$%s$$ 302" % \
+        cmd = "http redirect url %s %s 1 @@\<regex\>.*@@ @@\<regex\>.*@@ @@%s@@ @@%s@@ @@%s@@ 302" % \
                 (vs_name, policy_name, proto, host, path)
         return cmd
 
@@ -384,13 +384,13 @@ class ADCDevice(object):
             if key:
                 v_key = "^%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_ENDS_WITH:
-            v_str = "%s$ " % value
+            v_str = "%s$" % value
             if key:
-                v_key = "%s$ " % key
+                v_key = "%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_EQUAL_TO:
-            v_str = "^%s$ " % value
+            v_str = "^%s$" % value
             if key:
-                v_key = "^%s$ " % key
+                v_key = "^%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
             v_str = value
             if key:
@@ -404,7 +404,7 @@ class ADCDevice(object):
         if invert:
             v_str = "!%s" % v_str
 
-        cmd += " %s %s %s $$%s$$ 1" % (rule_id, vs_id, group_id, v_str)
+        cmd += " %s %s %s @@%s@@ 1" % (rule_id, vs_id, group_id, v_str)
         return cmd
 
     @staticmethod
