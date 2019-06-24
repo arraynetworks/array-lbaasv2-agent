@@ -101,7 +101,7 @@ class ArrayADCDriver(object):
 
         port_id = lb['vip_port_id']
 
-        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_cmcc(self.context, port_id)
+        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
         vlan_tag = ret_vlan['vlan_tag']
         if vlan_tag == '-1':
             LOG.debug("Cann't get the vlan_tag by port_id(%s)", port_id)
@@ -161,7 +161,7 @@ class ArrayADCDriver(object):
         argu = {}
 
         port_id = lb['vip_port_id']
-        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_cmcc(self.context, port_id)
+        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
         vlan_tag = ret_vlan['vlan_tag']
         if vlan_tag == '-1':
             LOG.debug("Cann't get the vlan_tag by port_id(%s)", port_id)

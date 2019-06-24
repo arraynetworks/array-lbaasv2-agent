@@ -14,7 +14,6 @@
 import errno
 import inspect
 import sys
-import uuid
 
 import array_lbaasv2_agent.common.exceptions as exceptions
 
@@ -85,12 +84,7 @@ def main():
 
     mgr = manager.LbaasAgentManager(cfg.CONF)
 
-    agent_host = None
-    if cfg.CONF.agent_id:
-        agent_host = cfg.CONF.agent_id
-    else:
-        agent_hash = str(uuid.uuid1())
-        agent_host = cfg.CONF.host + ":" + agent_hash
+    agent_host = cfg.CONF.host
     topic = "%s.%s" % (arrayconstants.TOPIC_LOADBALANCER_AGENT_V2, agent_host)
 
     svc = ArrayAgentService(

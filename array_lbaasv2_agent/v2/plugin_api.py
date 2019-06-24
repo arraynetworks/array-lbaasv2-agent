@@ -148,6 +148,10 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vlan_id_by_port_cmcc', port_id=port_id)
 
+    def get_vlan_id_by_port_huawei(self, context, port_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_vlan_id_by_port_huawei', port_id=port_id)
+
     def generate_vapv(self, context):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_vapv')
