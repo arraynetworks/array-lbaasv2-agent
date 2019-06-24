@@ -61,7 +61,19 @@ class ArrayCommonAPIDriver(object):
         self._create_vip(argu['vip_address'], argu['netmask'], argu['vlan_tag'],
                          va_name)
 
-        #TODO: should configure HA
+        #configure HA
+        if len(self.base_rest_urls) > 1:
+            priority = 90
+            for idx, base_rest_url in enumerate(self.base_rest_urls):
+                if idx == 1:
+                    priority = 100
+                elif idx == 2:
+                    priority = 110
+                elif idx == 3:
+                    priority = 120
+                else:
+                    break
+                self.configure_cluster(base_rest_url, 111, priority, argu['vip_address'], va_name)
         self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
                                     argu['subnet_id'], in_use_lb = 1)
 
@@ -74,7 +86,9 @@ class ArrayCommonAPIDriver(object):
         va_name = self.get_va_name(argu)
         # delete vip
         self._delete_vip(argu['vlan_tag'], va_name)
-        # TODO: should clear the HA configuration
+
+        # clear the HA configuration
+        self.clear_cluster(111, argu['vip_address'], va_name)
 
         # Delete the apv from database
         self.plugin_rpc.delete_vapv(self.context, va_name)
@@ -420,7 +434,7 @@ class ArrayCommonAPIDriver(object):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_no_rule, va_name)
 
-    def configure_cluster(self, cluster_id, priority, vip_address, va_name):
+    def configure_cluster(self, base_rest_url, cluster_id, priority, vip_address, va_name):
         # configure a virtual interface
         cmd_config_virtual_interface = ADCDevice.cluster_config_virtual_interface(cluster_id)
         # configure virtual vip
@@ -429,11 +443,10 @@ class ArrayCommonAPIDriver(object):
         cmd_config_virtual_priority = ADCDevice.cluster_config_priority(cluster_id, priority)
         # enable cluster
         cmd_enable_cluster = ADCDevice.cluster_enable(cluster_id)
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_config_virtual_interface, va_name)
-            self.run_cli_extend(base_rest_url, cmd_config_virtual_vip, va_name)
-            self.run_cli_extend(base_rest_url, cmd_config_virtual_priority, va_name)
-            self.run_cli_extend(base_rest_url, cmd_enable_cluster, va_name)
+        self.run_cli_extend(base_rest_url, cmd_config_virtual_interface, va_name)
+        self.run_cli_extend(base_rest_url, cmd_config_virtual_vip, va_name)
+        self.run_cli_extend(base_rest_url, cmd_config_virtual_priority, va_name)
+        self.run_cli_extend(base_rest_url, cmd_enable_cluster, va_name)
 
 
     def clear_cluster(self, cluster_id, vip_address, va_name):
