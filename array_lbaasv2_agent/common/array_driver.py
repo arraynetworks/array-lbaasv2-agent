@@ -436,13 +436,14 @@ class ArrayCommonAPIDriver(object):
 
     def configure_cluster(self, base_rest_url, cluster_id, priority, vip_address, va_name):
         # configure a virtual interface
-        cmd_config_virtual_interface = ADCDevice.cluster_config_virtual_interface(cluster_id)
+        in_interface = self.get_va_interface()
+        cmd_config_virtual_interface = ADCDevice.cluster_config_virtual_interface(in_interface, cluster_id)
         # configure virtual vip
-        cmd_config_virtual_vip = ADCDevice.cluster_config_vip(cluster_id, vip_address)
+        cmd_config_virtual_vip = ADCDevice.cluster_config_vip(in_interface, cluster_id, vip_address)
         # configure virtual priority
-        cmd_config_virtual_priority = ADCDevice.cluster_config_priority(cluster_id, priority)
+        cmd_config_virtual_priority = ADCDevice.cluster_config_priority(in_interface, cluster_id, priority)
         # enable cluster
-        cmd_enable_cluster = ADCDevice.cluster_enable(cluster_id)
+        cmd_enable_cluster = ADCDevice.cluster_enable(in_interface, cluster_id)
         self.run_cli_extend(base_rest_url, cmd_config_virtual_interface, va_name)
         self.run_cli_extend(base_rest_url, cmd_config_virtual_vip, va_name)
         self.run_cli_extend(base_rest_url, cmd_config_virtual_priority, va_name)
@@ -450,7 +451,8 @@ class ArrayCommonAPIDriver(object):
 
 
     def clear_cluster(self, cluster_id, vip_address, va_name):
-        cmd_no_config_virtual_vip = ADCDevice.no_cluster_config_vip(cluster_id, vip_address)
+        in_interface = self.get_va_interface()
+        cmd_no_config_virtual_vip = ADCDevice.no_cluster_config_vip(in_interface, cluster_id, vip_address)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_no_config_virtual_vip, va_name)
 

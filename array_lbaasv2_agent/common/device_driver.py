@@ -147,6 +147,10 @@ class ArrayADCDriver(object):
         argu['vip_id'] = lb['id']
         argu['vip_address'] = lb['vip_address']
         argu['netmask'] = str(member_network.netmask)
+        if member_network.version == 6:
+            str_ip = subnet['cidr']
+            idx = subnet['cidr'].find('/')
+            argu['netmask'] = subnet['cidr'][idx+1:]
         self.driver.create_loadbalancer(argu)
 
 
@@ -320,7 +324,7 @@ class ArrayADCDriver(object):
             # re-create healthmonitor
             if obj['healthmonitor']:
                 # FIXME: should directly update the hm
-                self.update_health_monitor(obj['healthmonitor'], old_obj['healthmonitor'])
+                self.create_health_monitor(obj['healthmonitor'])
 
     def delete_pool(self, obj):
         pool = obj
@@ -579,7 +583,6 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = listener['loadbalancer_id']
         argu['vs_id'] = policy['listener_id']
-        argu['rule_invert'] = rule['invert']
         if policy['redirect_pool']:
             argu['group_id'] = policy['redirect_pool']['id']
         else:
@@ -589,6 +592,7 @@ class ArrayADCDriver(object):
             LOG.debug("No any rule needs to be created.")
         elif cnt == 1:
             rule = rules[0]
+            argu['rule_invert'] = rule['invert']
             argu['rule_type'] = rule['type']
             argu['compare_type'] = rule['compare_type']
             argu['rule_id'] = rule['id']
@@ -600,6 +604,7 @@ class ArrayADCDriver(object):
             for rule_idx in range(cnt):
                 rule = rules[rule_idx]
 
+                argu['rule_invert'] = rule['invert']
                 argu['rule_type'] = rule['type']
                 argu['compare_type'] = rule['compare_type']
                 argu['rule_id'] = rule['id']

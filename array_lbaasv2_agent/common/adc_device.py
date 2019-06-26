@@ -404,7 +404,10 @@ class ADCDevice(object):
         if invert:
             v_str = "!%s" % v_str
 
-        cmd += " %s %s %s @@%s@@ 1" % (rule_id, vs_id, group_id, v_str)
+        if rule_type == lb_const.L7_RULE_TYPE_HEADER:
+            cmd += " %s %s %s @@%s@@ @@%s@@ 1" % (rule_id, vs_id, group_id, key, v_str)
+        else:
+            cmd += " %s %s %s @@%s@@ 1" % (rule_id, vs_id, group_id, v_str)
         return cmd
 
     @staticmethod
