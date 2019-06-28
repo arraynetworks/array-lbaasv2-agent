@@ -13,7 +13,6 @@
 import logging
 
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
-from array_lbaasv2_agent.common.adc_device import ADCDevice
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 
 LOG = logging.getLogger(__name__)

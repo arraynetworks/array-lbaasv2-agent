@@ -48,7 +48,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
 
         self.context = context.get_admin_context_without_session()
 
-        self.agent_host = conf.host
+        self.agent_host = conf.arraynetworks.array_management_ip
 
         ## callback to plugin
         self._setup_plugin_rpc()

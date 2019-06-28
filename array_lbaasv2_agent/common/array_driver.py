@@ -23,6 +23,7 @@ from array_lbaasv2_agent.common import exceptions as driver_except
 
 LOG = logging.getLogger(__name__)
 
+HA_GROUP_ID = 1
 
 def get_cluster_id_from_va_name(va_name):
     idx=va_name.find('va')
@@ -433,6 +434,35 @@ class ArrayCommonAPIDriver(object):
         cmd_no_rule = ADCDevice.no_l7_rule(argu['rule_id'], argu['rule_type'])
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_no_rule, va_name)
+
+    def configure_ha(self, base_rest_url, unit_list, vip_address, va_name):
+        in_interface = self.get_va_interface()
+
+        cmd_ha_group_id = ADCDevice.ha_group_id()
+        self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name)
+
+        for unit_item in unit_list:
+            unit_name = unit_item['name']
+            ip_address = unit_item['ip_address']
+            priority = unit_item['priority']
+            cmd_ha_unit = ADCDevice.ha_unit(unit_name, ip_address, 65521)
+            cmd_synconfig_peer = ADCDevice.synconfig_peer(unit_name, ip_address)
+            cmd_ha_group_priority = ADCDevice.ha_group_priority(unit_name, HA_GROUP_ID, priority)
+            self.run_cli_extend(base_rest_url, cmd_ha_unit, va_name)
+            self.run_cli_extend(base_rest_url, cmd_synconfig_peer, va_name)
+            self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name)
+
+        cmd_ha_group_fip = ADCDevice.ha_group_fip(HA_GROUP_ID, vip_address, in_interface)
+        cmd_ha_link_network_on = ADCDevice.ha_link_network_on()
+        cmd_ha_group_enable = ADCDevice.ha_group_enable(HA_GROUP_ID)
+        cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
+        cmd_ha_on = ADCDevice.ha_on()
+        self.run_cli_extend(base_rest_url, cmd_ha_group_fip, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
+
 
     def configure_cluster(self, base_rest_url, cluster_id, priority, vip_address, va_name):
         # configure a virtual interface

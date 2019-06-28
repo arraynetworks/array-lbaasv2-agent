@@ -148,7 +148,6 @@ class ArrayADCDriver(object):
         argu['vip_address'] = lb['vip_address']
         argu['netmask'] = str(member_network.netmask)
         if member_network.version == 6:
-            str_ip = subnet['cidr']
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
         self.driver.create_loadbalancer(argu)

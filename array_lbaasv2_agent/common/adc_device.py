@@ -441,6 +441,66 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ha_unit(name, ip_address, port):
+        cmd = "ha unit @@%s@@ %s %s" % (name, ip_address, port)
+        return cmd
+
+    @staticmethod
+    def no_ha_unit(name):
+        cmd = "no ha unit @@%s@@" % name
+        return cmd
+
+    @staticmethod
+    def synconfig_peer(name, ip_address):
+        cmd = "synconfig peer @@%s@@ %s" % (name, ip_address)
+        return cmd
+
+    @staticmethod
+    def ha_link_network_on():
+        cmd = "ha link network on"
+        return cmd
+
+    @staticmethod
+    def ha_link_ffo_on():
+        cmd = "ha link ffo on"
+        return cmd
+
+    @staticmethod
+    def ha_on():
+        cmd = "ha on"
+        return cmd
+
+    @staticmethod
+    def ha_off():
+        cmd = "ha off"
+        return cmd
+
+    @staticmethod
+    def ha_group_id(group_id):
+        cmd = "ha group id %d" % group_id
+        return cmd
+
+    @staticmethod
+    def ha_group_enable(group_id):
+        cmd = "ha group enable %d" % group_id
+        return cmd
+
+    @staticmethod
+    def ha_group_preempt_on(group_id):
+        cmd = "ha group preempt on %d" % group_id
+        return cmd
+
+    @staticmethod
+    def ha_group_fip(group_id, ip_address, port_name):
+        cmd = "ha group fip %d %s %s" % (group_id, ip_address, port_name)
+        return cmd
+
+    @staticmethod
+    def ha_group_priority(unit_name, group_id, priority):
+        cmd = "ha group priority %s %d %s" % (unit_name, group_id, priority)
+        return cmd
+
+    @staticmethod
     def write_memory():
         cmd = "write memory"
         return cmd
