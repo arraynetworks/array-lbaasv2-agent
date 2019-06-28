@@ -84,7 +84,7 @@ def main():
 
     mgr = manager.LbaasAgentManager(cfg.CONF)
 
-    agent_host = cfg.CONF.arraynetworks.array_management_ip
+    agent_host = cfg.CONF.arraynetworks.agent_host
     topic = "%s.%s" % (arrayconstants.TOPIC_LOADBALANCER_AGENT_V2, agent_host)
 
     svc = ArrayAgentService(

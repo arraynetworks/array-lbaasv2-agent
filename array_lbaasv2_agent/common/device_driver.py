@@ -35,6 +35,10 @@ OPTS = [
         help=('APV interfaces')
     ),
     cfg.StrOpt(
+        'agent_host',
+        help=('Array agent host name')
+    ),
+    cfg.StrOpt(
         'array_api_user',
         default='restful',
         help=('APV Restful API user')
