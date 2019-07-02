@@ -114,7 +114,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             self.plugin_rpc.lb_deleting_completion(context, obj)
         except ArrayADCException as e:
             LOG.exception('could not delete loadbalancer: %s, %s', obj['id'], e.msg)
-            self.plugin_rpc.lb_failed_completion(context, obj)
+            self.plugin_rpc.lb_deleting_completion(context, obj)
 
     @log_helpers.log_method_call
     def create_listener(self, context, obj):
