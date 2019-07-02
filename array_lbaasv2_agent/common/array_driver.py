@@ -556,8 +556,8 @@ class ArrayCommonAPIDriver(object):
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
-        conn_max_retries = 6
-        conn_retry_interval = 10
+        conn_max_retries = 3
+        conn_retry_interval = 5
         for a in six.moves.xrange(conn_max_retries):
             try:
                 r = requests.post(url,
