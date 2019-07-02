@@ -26,6 +26,22 @@ rm -f requirements.txt
 python setup.py install
 %py2_install
 
+%pre
+
+if [ -f /etc/neutron/conf.d/neutron-server/arraynetworks.conf ]; then
+install -m644 /etc/neutron/conf.d/neutron-server/arraynetworks.conf /etc/neutron/conf.d/neutron-server/arraynetworks.conf.rpmsave
+mv /etc/neutron/conf.d/neutron-server/arraynetworks.conf /etc/neutron/conf.d/neutron-server/.arraynetworks.conf.bakup
+fi
+
+%post
+
+if [ -f /etc/neutron/conf.d/neutron-server/arraynetworks.conf ]; then
+mv /etc/neutron/conf.d/neutron-server/.arraynetworks.conf.bakup /etc/neutron/conf.d/neutron-server/arraynetworks.conf
+fi
+
+/bin/systemctl daemon-reload >dev/null || :
+systemctl restart array-lbaasv2-agent
+
 %files -n %{pkg_name}
 %doc README.rst
 %license LICENSE
@@ -33,6 +49,7 @@ python setup.py install
 %{python2_sitelib}/*.egg-info
 /usr/lib/systemd/system/array-lbaasv2-agent.service
 /etc/neutron/conf.d/neutron-server/arraynetworks.conf
+/usr/bin/array-lbaasv2-agent
 
 %changelog
 * Thu Oct 25 2018 jarod.w <wangli2@arraynetworks.com.cn> 1.0.0-1
