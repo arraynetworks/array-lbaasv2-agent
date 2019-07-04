@@ -146,6 +146,7 @@ class ArrayADCDriver(object):
                 interface_mapping[host] = interfaces
         argu['interface_mapping'] = interface_mapping
 
+        argu['gateway'] = subnet['gateway_ip']
         argu['subnet_id'] = lb['vip_subnet_id']
         argu['tenant_id'] = lb['tenant_id']
         argu['vip_id'] = lb['id']

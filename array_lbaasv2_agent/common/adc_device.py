@@ -176,6 +176,8 @@ class ADCDevice(object):
         else:
             if algorithm == 'IC':
                 cmd = "slb group method %s ic array" % (name)
+            elif algorithm.lower() == 'lc':
+                cmd = "slb group method %s %s 1 yes" % (name, algorithm.lower())
             else:
                 cmd = "slb group method %s %s" % (name, algorithm.lower())
         return cmd
@@ -183,6 +185,11 @@ class ADCDevice(object):
     @staticmethod
     def no_group(name):
         cmd = "no slb group method %s" % name
+        return cmd
+
+    @staticmethod
+    def clear_config_all():
+        cmd = "clear config all"
         return cmd
 
     @staticmethod
@@ -195,29 +202,30 @@ class ADCDevice(object):
         (algorithm, first_choice_method, policy) = \
             service_group_lb_method(lb_algorithm, session_persistence_type)
 
-        cmd = None
+        cmd = []
         if policy == 'Default':
-            cmd = "slb policy default %s %s" % (vs_name, group_name)
+            cmd.append("slb policy default %s %s" % (vs_name, group_name))
         elif policy == 'PC':
-            cmd = "slb policy default %s %s; " % (vs_name, group_name)
-            cmd += "slb policy persistent cookie %s %s %s %s 100" % \
-                (vs_name, vs_name, group_name, cookie_name)
+            cmd.append("slb policy default %s %s" % (vs_name, group_name))
+            cmd.append("slb policy persistent cookie %s %s %s %s 100" % \
+                (vs_name, vs_name, group_name, cookie_name))
         elif policy == 'IC':
-            cmd = "slb policy default %s %s; " % (vs_name, group_name)
-            cmd += "slb policy icookie %s %s %s 100" % (vs_name, vs_name, group_name)
+            cmd.append("slb policy default %s %s" % (vs_name, group_name))
+            cmd.append("slb policy icookie %s %s %s 100" % (vs_name, vs_name, group_name))
         return cmd
 
     @staticmethod
     def no_policy(vs_name, lb_algorithm, session_persistence_type):
         (_, _, policy) = service_group_lb_method(lb_algorithm, \
                 session_persistence_type)
+        cmd = []
         if policy == 'Default':
-            cmd = "no slb policy default %s" % vs_name
+            cmd.append("no slb policy default %s" % vs_name)
         elif policy == 'PC':
-            cmd = "no slb policy persistent cookie %s" % vs_name
+            cmd.append("no slb policy persistent cookie %s" % vs_name)
         elif policy == 'IC':
-            cmd = "no slb policy default %s; " % vs_name
-            cmd += "no slb policy icookie %s" % vs_name
+            cmd.append("no slb policy default %s" % vs_name)
+            cmd.append("no slb policy icookie %s" % vs_name)
         return cmd
 
     @staticmethod

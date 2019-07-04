@@ -60,7 +60,7 @@ class ArrayCommonAPIDriver(object):
         va_name = self.get_va_name(argu)
         # create vip
         self._create_vip(argu['vip_address'], argu['netmask'], argu['vlan_tag'],
-                         va_name)
+                         argu['gateway'], va_name)
 
         #configure HA
         if len(self.base_rest_urls) > 1:
@@ -127,7 +127,7 @@ class ArrayCommonAPIDriver(object):
                                 argu['lb_algorithm'], va_name)
 
 
-    def _create_vip(self, vip_address, netmask, vlan_tag, va_name):
+    def _create_vip(self, vip_address, netmask, vlan_tag, gateway, va_name):
         """ create vip"""
 
         cmd_apv_config_vlan = None
@@ -140,10 +140,12 @@ class ArrayCommonAPIDriver(object):
             cmd_apv_config_vlan = ADCDevice.vlan_device(in_interface, interface_name, vlan_tag)
 
         cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
+        cmd_apv_config_route = ADCDevice.configure_route(gateway)
         for base_rest_url in self.base_rest_urls:
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
             self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
+            self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
 
 
     def _delete_vip(self, vlan_tag, va_name):
@@ -155,10 +157,13 @@ class ArrayCommonAPIDriver(object):
 
         LOG.debug("no the vip address into interface")
         cmd_apv_no_ip = ADCDevice.no_ip(interface_name)
+        cmd_clear_config_all = ADCDevice.clear_config_all()
+
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_ip, va_name)
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name)
+            self.run_cli_extend(base_rest_url, cmd_clear_config_all, va_name)
 
 
     def _create_vs(self,
@@ -207,7 +212,8 @@ class ArrayCommonAPIDriver(object):
                                                        )
 
         for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_apv_create_policy, va_name)
+            for cli in cmd_apv_create_policy:
+                self.run_cli_extend(base_rest_url, cli, va_name)
 
 
     def _delete_policy(self, listener_id, session_persistence_type, lb_algorithm, va_name):
@@ -218,7 +224,8 @@ class ArrayCommonAPIDriver(object):
                                                 session_persistence_type
                                                )
         for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_apv_no_policy, va_name)
+            for cli in cmd_apv_no_policy:
+                self.run_cli_extend(base_rest_url, cli, va_name)
 
 
     def create_pool(self, argu):
@@ -563,7 +570,7 @@ class ArrayCommonAPIDriver(object):
                 r = requests.post(url,
                                   json.dumps(payload),
                                   auth=self.get_auth(),
-                                  timeout=(5, 5),
+                                  timeout=(60, 60),
                                   verify=False)
                 LOG.debug("status_code: %d", r.status_code)
                 if r.status_code == 200:
