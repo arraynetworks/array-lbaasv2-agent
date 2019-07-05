@@ -170,4 +170,13 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'delete_vapv', vapv_name=vapv_name)
 
+    def update_member_status(self, context, member_id, operating_status):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'update_member_status',
+            member_id=member_id, operating_status=operating_status)
+
+    def get_members_status_on_agent(self, context, agent_host_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_members_status_on_agent',
+            agent_host_name=agent_host_name)
 

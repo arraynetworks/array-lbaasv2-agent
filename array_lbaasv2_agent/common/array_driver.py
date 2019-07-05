@@ -177,7 +177,8 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_no_ip, va_name)
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name)
-            self.run_cli_extend(base_rest_url, cmd_clear_config_all, va_name)
+            self.run_cli_extend(base_rest_url, cmd_clear_config_all, va_name,
+                connect_timeout=60, read_timeout=60)
             if cmd_no_bond_interfaces:
                 for cli in cmd_no_bond_interfaces:
                     self.run_cli_extend(base_rest_url, cli, va_name)
@@ -569,7 +570,8 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_activation_server, va_name)
 
 
-    def run_cli_extend(self, base_rest_url, cmd, va_name = None):
+    def run_cli_extend(self, base_rest_url, cmd, va_name=None,
+        connect_timeout=5, read_timeout=5):
         if not cmd:
             return
         url = base_rest_url + '/cli_extend'
@@ -587,7 +589,7 @@ class ArrayCommonAPIDriver(object):
                 r = requests.post(url,
                                   json.dumps(payload),
                                   auth=self.get_auth(),
-                                  timeout=(60, 60),
+                                  timeout=(connect_timeout, read_timeout),
                                   verify=False)
                 LOG.debug("status_code: %d", r.status_code)
                 if r.status_code == 200:
@@ -611,4 +613,36 @@ class ArrayCommonAPIDriver(object):
     def create_vapv(self, context, **model_kwargs):
         vapv = self.plugin_rpc.create_vapv(context, **model_kwargs);
         return vapv
+
+    def get_all_health_status(self, va_name):
+        status_dic = {}
+        cmd_get_status = ADCDevice.get_health_status()
+        for base_rest_url in self.base_rest_urls:
+            r = self.run_cli_extend(base_rest_url, cmd_get_status, va_name)
+            status_str_index = r.text.index("status")
+            health_check_index = r.text.index("Health Check")
+            status_match_str = r.text[status_str_index + 8: health_check_index].strip().strip('-')
+            status_match_list = status_match_str.split("\\n")
+            for status in status_match_list:
+                 if len(status) != 0:
+                     space_index = status.index(' ')
+                     server_name = status[:space_index]
+                     status_value = status[space_index:].strip()
+                     status_dic[server_name] = status_value
+        return status_dic
+
+    def get_status_by_lb_mems(self, lb_mems):
+        argu = {}
+        for lb_id, members in lb_mems.items():
+            argu['vip_id'] = lb_id
+            va_name = self.get_va_name(argu)
+            all_status = self.get_all_health_status(va_name)
+            LOG.debug("all_status: %s" % all_status)
+            for member_name, status in members.items():
+                if all_status.has_key(member_name):
+                    if 'DOWN' in all_status[member_name]:
+                        lb_mems[lb_id][member_name] = lb_const.OFFLINE
+                    elif 'UP' in all_status[member_name]:
+                        lb_mems[lb_id][member_name] = lb_const.ONLINE
+        return lb_mems
 

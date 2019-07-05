@@ -16,6 +16,7 @@ import netaddr
 from oslo_config import cfg
 from oslo_utils import importutils
 import logging
+import copy
 
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
 from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
@@ -637,4 +638,19 @@ class ArrayADCDriver(object):
         else:
             LOG.debug("It doesn't support to create more than three rule in one policy.")
 
+    def update_member_status(self, agent_host_name):
+        lb_members = self.plugin_rpc.get_members_status_on_agent(self.context,
+            agent_host_name)
+        lb_members_ori = copy.deepcopy(lb_members)
+        LOG.debug("lb_members_ori: ----%s----" % lb_members_ori)
+        lb_members = self.driver.get_status_by_lb_mems(lb_members)
+        LOG.debug("lb_members: ----%s----" % lb_members)
+        for lb_id, lb_members_status in lb_members_ori.items():
+            for member_id, member_status in lb_members_status.items():
+                new_member_status = lb_members[lb_id][member_id]
+                LOG.debug("new_member_status(%s)---member_status(%s)" % (new_member_status, member_status))
+                if new_member_status != member_status:
+                    LOG.debug("--------will update_member_status -------")
+                    self.plugin_rpc.update_member_status(self.context,
+                        member_id, new_member_status)
 

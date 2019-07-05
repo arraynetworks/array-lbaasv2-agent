@@ -65,6 +65,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             'start_flag': True,
         }
 
+
     def _setup_plugin_rpc(self):
         self.plugin_rpc = plugin_api.ArrayPluginApi(
             constants_v2.TOPIC_PROCESS_ON_HOST_V2,
@@ -72,9 +73,15 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         )
 
         self.report_state_rpc = agent_rpc.PluginReportStateAPI(constants_v2.TOPIC_PROCESS_ON_HOST_V2)
-        heartbeat = loopingcall.FixedIntervalLoopingCall(self._report_state)
-        heartbeat.start(interval=30)
+        heartbeat_agent_status = loopingcall.FixedIntervalLoopingCall(self._report_state)
+        heartbeat_agent_status.start(interval=30)
 
+        heartbeat_lb_status = loopingcall.FixedIntervalLoopingCall(self.update_lb_status)
+        heartbeat_lb_status.start(interval=45)
+
+
+    def update_lb_status(self):
+        self.driver.update_member_status(self.agent_host)
 
     def _report_state(self):
         LOG.info("entering _report_state");

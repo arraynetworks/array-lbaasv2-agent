@@ -40,7 +40,6 @@ mv /etc/neutron/conf.d/neutron-server/.arraynetworks.conf.bakup /etc/neutron/con
 fi
 
 /bin/systemctl daemon-reload >dev/null || :
-systemctl restart array-lbaasv2-agent
 
 %files -n %{pkg_name}
 %doc README.rst
