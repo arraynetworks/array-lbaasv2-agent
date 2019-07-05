@@ -48,6 +48,11 @@ OPTS = [
         default='click1',
         help=('APV Restful API password')
     ),
+    cfg.BoolOpt(
+        'bonding',
+        default=False,
+        help=('Enable bonding in APV')
+    ),
     cfg.StrOpt(
         'array_device_driver',
         default=('array_lbaasv2_agent.common.avx_driver.ArrayAVXAPIDriver'),

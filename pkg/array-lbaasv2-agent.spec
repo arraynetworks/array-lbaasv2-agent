@@ -29,13 +29,13 @@ python setup.py install
 %pre
 
 if [ -f /etc/neutron/conf.d/neutron-server/arraynetworks.conf ]; then
-install -m644 /etc/neutron/conf.d/neutron-server/arraynetworks.conf /etc/neutron/conf.d/neutron-server/arraynetworks.conf.rpmsave
 mv /etc/neutron/conf.d/neutron-server/arraynetworks.conf /etc/neutron/conf.d/neutron-server/.arraynetworks.conf.bakup
 fi
 
 %post
 
 if [ -f /etc/neutron/conf.d/neutron-server/arraynetworks.conf ]; then
+install -m644 /etc/neutron/conf.d/neutron-server/arraynetworks.conf /etc/neutron/conf.d/neutron-server/arraynetworks.conf.rpmsave
 mv /etc/neutron/conf.d/neutron-server/.arraynetworks.conf.bakup /etc/neutron/conf.d/neutron-server/arraynetworks.conf
 fi
 

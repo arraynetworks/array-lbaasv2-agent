@@ -12,6 +12,7 @@
 #
 import logging
 
+from oslo_config import cfg
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 
@@ -66,5 +67,8 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
         return va_name
 
     def get_va_interface(self):
-        return "port1"
+        if cfg.CONF.arraynetworks.bonding:
+            return "bond1"
+        else:
+            return "port1"
 

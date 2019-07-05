@@ -504,6 +504,20 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def bond_interface():
+        cmd = []
+        cmd.append("bond interface bond1 port1")
+        cmd.append("bond interface bond1 port2")
+        return cmd
+
+    @staticmethod
+    def no_bond_interface():
+        cmd = []
+        cmd.append("no bond interface bond1 port1")
+        cmd.append("no bond interface bond1 port2")
+        return cmd
+
+    @staticmethod
     def ha_group_priority(unit_name, group_id, priority):
         cmd = "ha group priority %s %d %s" % (unit_name, group_id, priority)
         return cmd

@@ -17,6 +17,8 @@ import time
 import requests
 
 from oslo_log import log as logging
+from oslo_config import cfg
+
 from neutron_lbaas.services.loadbalancer import constants as lb_const
 from array_lbaasv2_agent.common.adc_device import ADCDevice
 from array_lbaasv2_agent.common import exceptions as driver_except
@@ -133,7 +135,11 @@ class ArrayCommonAPIDriver(object):
         cmd_apv_config_vlan = None
         in_interface = self.get_va_interface()
         interface_name = in_interface
-        # configure vip
+
+        cmd_bond_interfaces = []
+        if cfg.CONF.arraynetworks.bonding:
+            cmd_bond_interfaces = ADCDevice.bond_interface()
+
         LOG.debug("Configure the vip address into interface")
         if vlan_tag:
             interface_name = "vlan." + vlan_tag
@@ -142,6 +148,9 @@ class ArrayCommonAPIDriver(object):
         cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
         cmd_apv_config_route = ADCDevice.configure_route(gateway)
         for base_rest_url in self.base_rest_urls:
+            if cmd_bond_interfaces:
+                for cli in cmd_bond_interfaces:
+                    self.run_cli_extend(base_rest_url, cli, va_name)
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
             self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
@@ -151,6 +160,11 @@ class ArrayCommonAPIDriver(object):
     def _delete_vip(self, vlan_tag, va_name):
         cmd_apv_no_vlan_device = None
         interface_name = self.get_va_interface()
+
+        cmd_no_bond_interfaces = []
+        if cfg.CONF.arraynetworks.bonding:
+            cmd_no_bond_interfaces = ADCDevice.no_bond_interface()
+
         if vlan_tag:
             interface_name = "vlan." + vlan_tag
             cmd_apv_no_vlan_device = ADCDevice.no_vlan_device(interface_name)
@@ -164,6 +178,9 @@ class ArrayCommonAPIDriver(object):
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name)
             self.run_cli_extend(base_rest_url, cmd_clear_config_all, va_name)
+            if cmd_no_bond_interfaces:
+                for cli in cmd_no_bond_interfaces:
+                    self.run_cli_extend(base_rest_url, cli, va_name)
 
 
     def _create_vs(self,
