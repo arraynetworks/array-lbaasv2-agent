@@ -117,11 +117,11 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'hm_deleting_completion', obj=obj)
 
-    def create_port_on_subnet(self, context, subnet_id, name,
+    def create_port_on_subnet(self, context, subnet_id, name, host,
             fixed_address_count=1):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'create_port_on_subnet',
-                subnet_id=subnet_id, name=name,
+                subnet_id=subnet_id, name=name, host=host,
                 fixed_address_count=fixed_address_count)
 
     def get_subnet(self, context, subnet_id):
@@ -156,15 +156,20 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_vapv')
 
+    def get_va_name_by_lb_id(self, context, vip_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_va_name_by_lb_id', vip_id=vip_id)
+
     def get_vapv_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vapv_by_lb_id', vip_id=vip_id)
 
-    def create_vapv(self, context, vapv_name, lb_id, subnet_id, in_use_lb):
+    def create_vapv(self, context, vapv_name, lb_id, subnet_id,
+        in_use_lb, pri_port_id, sec_port_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'create_vapv', vapv_name=vapv_name,
-                          lb_id=lb_id, subnet_id=subnet_id,
-                          in_use_lb=in_use_lb)
+            lb_id=lb_id, subnet_id=subnet_id, pri_port_id=pri_port_id,
+            sec_port_id=sec_port_id, in_use_lb=in_use_lb)
 
     def delete_vapv(self, context, vapv_name):
         cctxt = self.client.prepare()

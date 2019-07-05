@@ -142,11 +142,13 @@ class ArrayADCDriver(object):
         if len(self.hosts) > 1:
             cnt = 0
             LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
+            hostname = self.conf.arraynetworks.agent_host
             for host in self.hosts:
                 interfaces = {}
-                port_name = '_lb-port-' + str(cnt) + '-'+ subnet_id
+                port_name = 'lb' + '-'+ lb['id'] + "_" + str(cnt)
                 cnt += 1
-                port = self.plugin_rpc.create_port_on_subnet(self.context, subnet_id, port_name)
+                port = self.plugin_rpc.create_port_on_subnet(self.context,
+                    subnet_id, port_name, hostname)
                 interfaces['address'] = port['fixed_ips'][0]['ip_address']
                 interfaces['port_id'] = port['id']
                 interface_mapping[host] = interfaces

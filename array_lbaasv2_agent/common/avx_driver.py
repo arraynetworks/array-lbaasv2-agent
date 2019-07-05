@@ -56,7 +56,7 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
             msg = "No loadbalance_id in argument, raise it"
             raise ArrayADCException(msg)
 
-        ret_vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, vip_id)
+        ret_vapv = self.plugin_rpc.get_va_name_by_lb_id(self.context, vip_id)
         if not ret_vapv:
             LOG.debug("Will allocate the va from pools")
             ret_vapv = self.plugin_rpc.generate_vapv(self.context)

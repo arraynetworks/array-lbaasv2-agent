@@ -60,25 +60,38 @@ class ArrayCommonAPIDriver(object):
             return
 
         va_name = self.get_va_name(argu)
+        pri_port_id = None
+        sec_port_id = None
         # create vip
-        self._create_vip(argu['vip_address'], argu['netmask'], argu['vlan_tag'],
-                         argu['gateway'], va_name)
+        if len(self.hostnames) == 1:
+            self._create_vip(self.base_rest_urls, argu['vip_address'],
+                argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name)
+        else:
+            interface_mapping = argu['interface_mapping']
+            unit_list = []
+            for idx, host in enumerate(self.hostnames):
+                unit_item = {}
+                ip_address = interface_mapping[host]['address']
+                unit_item['ip_address'] = ip_address
+                if idx == 0:
+                    unit_item['priority'] = 90
+                    unit_item['name'] = argu['vip_id'][:6] + '_p'
+                    pri_port_id = interface_mapping[host]['port_id']
+                elif idx == 1:
+                    sec_port_id = interface_mapping[host]['port_id']
+                    unit_item['name'] = argu['vip_id'][:6] + '_s'
+                    unit_item['priority'] = 100
+                base_rest_url = self.base_rest_urls[idx]
+                self._create_vip(base_rest_url, ip_address, argu['netmask'],
+                    argu['vlan_tag'], argu['gateway'], va_name)
+            for base_rest_url in self.base_rest_urls:
+                self.configure_ha(base_rest_url, unit_list,
+                    argu['vip_address'], argu['vlan_tag'], va_name)
 
-        #configure HA
-        if len(self.base_rest_urls) > 1:
-            priority = 90
-            for idx, base_rest_url in enumerate(self.base_rest_urls):
-                if idx == 1:
-                    priority = 100
-                elif idx == 2:
-                    priority = 110
-                elif idx == 3:
-                    priority = 120
-                else:
-                    break
-                self.configure_cluster(base_rest_url, 111, priority, argu['vip_address'], va_name)
         self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
-                                    argu['subnet_id'], in_use_lb = 1)
+            argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
+            sec_port_id=sec_port_id)
+
 
     def delete_loadbalancer(self, argu):
         """ Delete a loadbalancer """
@@ -91,7 +104,20 @@ class ArrayCommonAPIDriver(object):
         self._delete_vip(argu['vlan_tag'], va_name)
 
         # clear the HA configuration
-        self.clear_cluster(111, argu['vip_address'], va_name)
+        if len(self.hostnames) > 1:
+            unit_list = []
+            for idx, host in enumerate(self.hostnames):
+                unit_item = {}
+                if idx == 0:
+                    unit_item['name'] = argu['vip_id'][:6] + '_p'
+                elif idx == 1:
+                    unit_item['name'] = argu['vip_id'][:6] + '_s'
+            for base_rest_url in self.base_rest_urls:
+                self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name)
+
+            vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, argu['vip_id'])
+            self.plugin_rpc.delete_port(self.context, vapv['pri_port_id'])
+            self.plugin_rpc.delete_port(self.context, vapv['sec_port_id'])
 
         # Delete the apv from database
         self.plugin_rpc.delete_vapv(self.context, va_name)
@@ -129,7 +155,7 @@ class ArrayCommonAPIDriver(object):
                                 argu['lb_algorithm'], va_name)
 
 
-    def _create_vip(self, vip_address, netmask, vlan_tag, gateway, va_name):
+    def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name):
         """ create vip"""
 
         cmd_apv_config_vlan = None
@@ -147,14 +173,22 @@ class ArrayCommonAPIDriver(object):
 
         cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
         cmd_apv_config_route = ADCDevice.configure_route(gateway)
-        for base_rest_url in self.base_rest_urls:
-            if cmd_bond_interfaces:
+
+        if isinstance(base_rest_urls, list):
+            for base_rest_url in base_rest_urls:
                 for cli in cmd_bond_interfaces:
                     self.run_cli_extend(base_rest_url, cli, va_name)
+                if vlan_tag:
+                    self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
+                self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
+                self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+        else:
+            for cli in cmd_bond_interfaces:
+                self.run_cli_extend(base_rest_urls, cli, va_name)
             if vlan_tag:
-                self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
-            self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
-            self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+                self.run_cli_extend(base_rest_urls, cmd_apv_config_vlan, va_name)
+            self.run_cli_extend(base_rest_urls, cmd_apv_config_ip, va_name)
+            self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
 
 
     def _delete_vip(self, vlan_tag, va_name):
@@ -177,11 +211,11 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_no_ip, va_name)
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name)
-            self.run_cli_extend(base_rest_url, cmd_clear_config_all, va_name,
-                connect_timeout=60, read_timeout=60)
             if cmd_no_bond_interfaces:
                 for cli in cmd_no_bond_interfaces:
                     self.run_cli_extend(base_rest_url, cli, va_name)
+            self.run_cli_extend(base_rest_url, cmd_clear_config_all, va_name,
+                connect_timeout=60, read_timeout=60)
 
 
     def _create_vs(self,
@@ -460,10 +494,13 @@ class ArrayCommonAPIDriver(object):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_no_rule, va_name)
 
-    def configure_ha(self, base_rest_url, unit_list, vip_address, va_name):
+    def configure_ha(self, base_rest_url, unit_list, vip_address,
+        vlan_tag, va_name):
         in_interface = self.get_va_interface()
+        if vlan_tag:
+            in_interface = "vlan." + vlan_tag
 
-        cmd_ha_group_id = ADCDevice.ha_group_id()
+        cmd_ha_group_id = ADCDevice.ha_group_id(HA_GROUP_ID)
         self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name)
 
         for unit_item in unit_list:
@@ -489,27 +526,16 @@ class ArrayCommonAPIDriver(object):
         self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
 
 
-    def configure_cluster(self, base_rest_url, cluster_id, priority, vip_address, va_name):
-        # configure a virtual interface
-        in_interface = self.get_va_interface()
-        cmd_config_virtual_interface = ADCDevice.cluster_config_virtual_interface(in_interface, cluster_id)
-        # configure virtual vip
-        cmd_config_virtual_vip = ADCDevice.cluster_config_vip(in_interface, cluster_id, vip_address)
-        # configure virtual priority
-        cmd_config_virtual_priority = ADCDevice.cluster_config_priority(in_interface, cluster_id, priority)
-        # enable cluster
-        cmd_enable_cluster = ADCDevice.cluster_enable(in_interface, cluster_id)
-        self.run_cli_extend(base_rest_url, cmd_config_virtual_interface, va_name)
-        self.run_cli_extend(base_rest_url, cmd_config_virtual_vip, va_name)
-        self.run_cli_extend(base_rest_url, cmd_config_virtual_priority, va_name)
-        self.run_cli_extend(base_rest_url, cmd_enable_cluster, va_name)
+    def clear_ha(self, base_rest_url, unit_list, vip_address, va_name):
+        cmd_ha_group_disable = ADCDevice.ha_group_disable(HA_GROUP_ID)
+        cmd_ha_no_group_fip = ADCDevice.ha_no_group_fip(HA_GROUP_ID, vip_address)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_disable, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_no_group_fip, va_name)
 
-
-    def clear_cluster(self, cluster_id, vip_address, va_name):
-        in_interface = self.get_va_interface()
-        cmd_no_config_virtual_vip = ADCDevice.no_cluster_config_vip(in_interface, cluster_id, vip_address)
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_no_config_virtual_vip, va_name)
+        for unit_item in unit_list:
+            unit_name = unit_item['name']
+            cmd_no_ha_unit = ADCDevice.no_ha_unit(unit_name)
+            self.run_cli_extend(base_rest_url, cmd_no_ha_unit, va_name)
 
 
     def start_vhost(self, vhost_name, va_name):
@@ -609,10 +635,6 @@ class ArrayCommonAPIDriver(object):
 
         raise driver_except.TimeOutException()
 
-
-    def create_vapv(self, context, **model_kwargs):
-        vapv = self.plugin_rpc.create_vapv(context, **model_kwargs);
-        return vapv
 
     def get_all_health_status(self, va_name):
         status_dic = {}

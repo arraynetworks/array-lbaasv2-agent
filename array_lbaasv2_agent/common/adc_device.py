@@ -489,8 +489,18 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ha_no_group_id(group_id):
+        cmd = "no ha group id %d" % group_id
+        return cmd
+
+    @staticmethod
     def ha_group_enable(group_id):
         cmd = "ha group enable %d" % group_id
+        return cmd
+
+    @staticmethod
+    def ha_group_disable(group_id):
+        cmd = "ha group disable %d" % group_id
         return cmd
 
     @staticmethod
@@ -501,6 +511,11 @@ class ADCDevice(object):
     @staticmethod
     def ha_group_fip(group_id, ip_address, port_name):
         cmd = "ha group fip %d %s %s" % (group_id, ip_address, port_name)
+        return cmd
+
+    @staticmethod
+    def ha_no_group_fip(group_id, ip_address):
+        cmd = "no ha group fip %d %s" % (group_id, ip_address)
         return cmd
 
     @staticmethod
