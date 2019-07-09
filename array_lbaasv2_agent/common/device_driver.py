@@ -18,6 +18,8 @@ from oslo_utils import importutils
 import logging
 import copy
 
+from neutron_lbaas.services.loadbalancer import constants as lb_const
+
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
 from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
 
@@ -468,7 +470,7 @@ class ArrayADCDriver(object):
 
         old_policy = old_rule['policy']
         policy = rule['policy']
-        if policy_changed:
+        if policy_changed or need_recreate:
             LOG.debug("Delete all rules from old policy in update_l7_rule")
             self.delete_all_rules(old_policy)
             LOG.debug("Delete all rules from new policy in update_l7_rule")
@@ -599,6 +601,9 @@ class ArrayADCDriver(object):
             argu['group_id'] = policy['redirect_pool']['id']
         else:
             argu['group_id'] = policy['listener']['default_pool_id']
+
+        if policy['action'] == lb_const.L7_POLICY_ACTION_REJECT:
+            argu['group_id'] = policy['id']
 
         if cnt == 0:
             LOG.debug("No any rule needs to be created.")
