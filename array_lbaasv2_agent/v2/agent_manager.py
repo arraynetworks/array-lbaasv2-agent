@@ -81,7 +81,10 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
 
 
     def update_lb_status(self):
-        self.driver.update_member_status(self.agent_host)
+        try:
+            self.driver.update_member_status(self.agent_host)
+        except Exception as e:
+            LOG.debug("failed to update member status: %s" % e.msg)
 
     def _report_state(self):
         LOG.info("entering _report_state");
