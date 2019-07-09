@@ -57,6 +57,10 @@ OPTS = [
         help=('Enable bonding in APV')
     ),
     cfg.StrOpt(
+        'environment_postfix',
+        help='environment postfix if need'
+    ),
+    cfg.StrOpt(
         'array_device_driver',
         default=('array_lbaasv2_agent.common.avx_driver.ArrayAVXAPIDriver'),
         help=('The driver used to provision ADC product')

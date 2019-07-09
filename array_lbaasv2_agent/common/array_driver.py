@@ -598,6 +598,7 @@ class ArrayCommonAPIDriver(object):
 
     def run_cli_extend(self, base_rest_url, cmd, va_name=None,
         connect_timeout=5, read_timeout=5):
+        exception = None
         if not cmd:
             return
         url = base_rest_url + '/cli_extend'

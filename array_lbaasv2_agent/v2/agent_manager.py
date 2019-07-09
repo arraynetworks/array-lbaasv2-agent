@@ -45,10 +45,14 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         LOG.info('Initializing LbaasAgentManager with conf %s' % conf)
         cfg.CONF.log_opt_values(LOG, logging.INFO)
         self.conf = conf
-
         self.context = context.get_admin_context_without_session()
-
         self.agent_host = conf.arraynetworks.agent_host
+        self.env_postfix = conf.arraynetworks.environment_postfix
+
+        if self.env_postfix:
+            LOG.debug("----------------env_postfix: %s--------------", self.env_postfix)
+        else:
+            LOG.debug("----------------env_postfix is None --------------")
 
         ## callback to plugin
         self._setup_plugin_rpc()
@@ -56,23 +60,28 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         # Load the driver.
         self.driver = ArrayADCDriver(conf, self.plugin_rpc, self.context)
 
+        configurations = {}
+        configurations['device_drivers'] = ['array']
+        if self.env_postfix:
+            configurations['environment'] = self.env_postfix
+
         self.agent_state = {
             'binary': constants_v2.AGENT_BINARY_NAME,
             'host': self.agent_host,
             'topic': constants_v2.TOPIC_LOADBALANCER_AGENT_V2,
-            'configurations': {'device_drivers': ['array']},
+            'configurations': configurations,
             'agent_type': constants_v2.ARRAY_AGENT_TYPE_LOADBALANCERV2,
             'start_flag': True,
         }
 
 
     def _setup_plugin_rpc(self):
-        self.plugin_rpc = plugin_api.ArrayPluginApi(
-            constants_v2.TOPIC_PROCESS_ON_HOST_V2,
-            self.conf.host
-        )
+        topic = constants_v2.TOPIC_PROCESS_ON_HOST_V2
+        if self.env_postfix:
+            topic = topic + '_' + self.env_postfix
+        self.plugin_rpc = plugin_api.ArrayPluginApi(topic, self.conf.host)
 
-        self.report_state_rpc = agent_rpc.PluginReportStateAPI(constants_v2.TOPIC_PROCESS_ON_HOST_V2)
+        self.report_state_rpc = agent_rpc.PluginReportStateAPI(topic)
         heartbeat_agent_status = loopingcall.FixedIntervalLoopingCall(self._report_state)
         heartbeat_agent_status.start(interval=30)
 
