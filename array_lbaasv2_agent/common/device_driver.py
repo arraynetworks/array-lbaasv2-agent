@@ -149,6 +149,11 @@ class ArrayADCDriver(object):
             cnt = 0
             LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
             hostname = self.conf.arraynetworks.agent_host
+
+            port_name = lb['id'] + "_pool"
+            ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
+                subnet_id, port_name, hostname)
+            argu['pool_address'] = ip_pool_port['fixed_ips'][0]['ip_address']
             for host in self.hosts:
                 interfaces = {}
                 port_name = 'lb' + '-'+ lb['id'] + "_" + str(cnt)
@@ -208,13 +213,6 @@ class ArrayADCDriver(object):
                     argu['vlan_tag'] = str(segment_id)
                 if network_type:
                     argu['network_type'] = network_type
-
-        if len(self.hosts) > 1:
-            LOG.debug("Will delete the port created by ourselves.")
-            #TODO: delete the ha port
-            #for host in self.hosts:
-            #    port_id = mapping[host]
-            #    self.plugin_rpc.delete_port(self.context, port_id)
 
         self.driver.delete_loadbalancer(argu)
 
@@ -601,6 +599,8 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = listener['loadbalancer_id']
         argu['vs_id'] = policy['listener_id']
+        argu['action'] = policy['action']
+        argu['redirect_url'] = policy['redirect_url']
         if policy['redirect_pool']:
             argu['group_id'] = policy['redirect_pool']['id']
         else:
@@ -619,8 +619,9 @@ class ArrayADCDriver(object):
             argu['rule_id'] = rule['id']
             argu['rule_value'] = rule['value']
             argu['rule_key'] = rule['key']
-            self.driver.create_l7_rule(argu)
+            self.driver.create_l7_rule(argu, action_created=True)
         elif cnt == 2 or cnt == 3:
+            created = False
             vlinks = get_vlinks_by_policy(policy['id'])
             for rule_idx in range(cnt):
                 rule = rules[rule_idx]
@@ -634,6 +635,7 @@ class ArrayADCDriver(object):
                 if rule_idx == 0:
                     argu['group_id'] = vlinks[0]
                 elif rule_idx == (cnt - 1):
+                    created = True
                     if policy['redirect_pool']:
                         argu['group_id'] = policy['redirect_pool']['id']
                     else:
@@ -645,7 +647,7 @@ class ArrayADCDriver(object):
                 else:
                     argu['group_id'] = vlinks[1]
                     argu['vs_id'] = vlinks[0];
-                self.driver.create_l7_rule(argu)
+                self.driver.create_l7_rule(argu, action_created=created)
         else:
             LOG.debug("It doesn't support to create more than three rule in one policy.")
 

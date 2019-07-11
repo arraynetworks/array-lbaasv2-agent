@@ -144,6 +144,10 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'delete_port', port_id=port_id)
 
+    def delete_port_by_name(self, context, port_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'delete_port_by_name', port_name=port_name)
+
     def get_vlan_id_by_port_cmcc(self, context, port_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vlan_id_by_port_cmcc', port_id=port_id)

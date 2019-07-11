@@ -69,24 +69,27 @@ class ArrayCommonAPIDriver(object):
         else:
             interface_mapping = argu['interface_mapping']
             unit_list = []
+            pool_name = "pool_" + argu['vip_id']
             for idx, host in enumerate(self.hostnames):
                 unit_item = {}
                 ip_address = interface_mapping[host]['address']
                 unit_item['ip_address'] = ip_address
                 if idx == 0:
-                    unit_item['priority'] = 90
+                    unit_item['priority'] = 100
                     unit_item['name'] = argu['vip_id'][:6] + '_p'
                     pri_port_id = interface_mapping[host]['port_id']
                 elif idx == 1:
                     sec_port_id = interface_mapping[host]['port_id']
                     unit_item['name'] = argu['vip_id'][:6] + '_s'
-                    unit_item['priority'] = 100
+                    unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
                     argu['vlan_tag'], argu['gateway'], va_name)
+                unit_list.append(unit_item)
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
-                    argu['vip_address'], argu['vlan_tag'], va_name)
+                    argu['vip_address'], argu['vlan_tag'],
+                    pool_name, argu['pool_address'], va_name)
 
         self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
             argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
@@ -112,10 +115,13 @@ class ArrayCommonAPIDriver(object):
                     unit_item['name'] = argu['vip_id'][:6] + '_p'
                 elif idx == 1:
                     unit_item['name'] = argu['vip_id'][:6] + '_s'
+                unit_list.append(unit_item)
             for base_rest_url in self.base_rest_urls:
                 self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name)
 
             vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, argu['vip_id'])
+            pool_port_name = argu['vip_id'] + "_pool"
+            self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
             self.plugin_rpc.delete_port(self.context, vapv['pri_port_id'])
             self.plugin_rpc.delete_port(self.context, vapv['sec_port_id'])
 
@@ -265,7 +271,7 @@ class ArrayCommonAPIDriver(object):
 
         for base_rest_url in self.base_rest_urls:
             for cli in cmd_apv_create_policy:
-                self.run_cli_extend(base_rest_url, cli, va_name)
+                self.run_cli_extend(base_rest_url, cli, va_name, connect_timeout=60, read_timeout=60)
 
 
     def _delete_policy(self, listener_id, session_persistence_type, lb_algorithm, va_name):
@@ -292,8 +298,17 @@ class ArrayCommonAPIDriver(object):
                                                       argu['lb_algorithm'],
                                                       argu['session_persistence_type']
                                                      )
+        cmd_slb_proxyip_group = None
+        if len(self.hostnames) > 1:
+            pool_name = "pool_" + argu['vip_id']
+            cmd_slb_proxyip_group = ADCDevice.slb_proxyip_group(argu['pool_id'], pool_name)
+            cmd_ha_on = ADCDevice.ha_on()
+
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_create_group, va_name)
+            if len(self.hostnames) > 1:
+                self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
+                self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
 
         # create policy
         if argu['listener_id']:
@@ -403,27 +418,11 @@ class ArrayCommonAPIDriver(object):
             LOG.error("In create_l7_policy, it should not pass the None.")
             return
 
-        cmd_create_group = None
-        cmd_http_load_error_page = None
-        cmd_redirect_to_url = None
         va_name = self.get_va_name(argu)
         if argu['pool_id']:
             self._create_policy(argu['pool_id'], argu['listener_id'],
                                 argu['session_persistence_type'],
                                 argu['lb_algorithm'], argu['cookie_name'], va_name)
-
-        if argu['action'] == lb_const.L7_POLICY_ACTION_REJECT:
-            # create the group using the policy_id
-            cmd_create_group = ADCDevice.create_group(
-                                                      argu['id'],
-                                                      lb_const.LB_METHOD_ROUND_ROBIN,
-                                                      None
-                                                     )
-            cmd_http_load_error_page = ADCDevice.load_http_error_page()
-        elif argu['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_URL:
-            cmd_redirect_to_url = ADCDevice.redirect_to_url(argu['listener_id'],
-                                                            argu['id'],
-                                                            argu['redirect_url'])
 
         if not updated:
             vlinks = get_vlinks_by_policy(argu['id'])
@@ -431,11 +430,6 @@ class ArrayCommonAPIDriver(object):
                 cmd_create_vlink = ADCDevice.create_vlink(vlink)
                 for base_rest_url in self.base_rest_urls:
                     self.run_cli_extend(base_rest_url, cmd_create_vlink, va_name)
-
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_create_group, va_name)
-            self.run_cli_extend(base_rest_url, cmd_http_load_error_page, va_name)
-            self.run_cli_extend(base_rest_url, cmd_redirect_to_url, va_name)
 
 
     def delete_l7_policy(self, argu, updated=False):
@@ -448,13 +442,6 @@ class ArrayCommonAPIDriver(object):
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
                                 argu['lb_algorithm'], va_name)
 
-        cmd_no_group = None
-        cmd_no_redirect_to_url = None
-        if argu['action'] == lb_const.L7_POLICY_ACTION_REJECT:
-            cmd_no_group = ADCDevice.no_group(argu['id'])
-        elif argu['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_URL:
-            cmd_no_redirect_to_url = ADCDevice.no_redirect_to_url(argu["listener_id"], argu['id'])
-
         if not updated:
             vlinks = get_vlinks_by_policy(argu['id'])
             for vlink in vlinks:
@@ -462,12 +449,8 @@ class ArrayCommonAPIDriver(object):
                 for base_rest_url in self.base_rest_urls:
                     self.run_cli_extend(base_rest_url, cmd_no_vlink, va_name)
 
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_no_group, va_name)
-            self.run_cli_extend(base_rest_url, cmd_no_redirect_to_url, va_name)
 
-
-    def create_l7_rule(self, argu):
+    def create_l7_rule(self, argu, action_created=False):
         if not argu:
             LOG.error("In create_l7_rule, it should not pass the None.")
             return
@@ -481,27 +464,44 @@ class ArrayCommonAPIDriver(object):
                                                    argu['rule_value'],
                                                    argu['rule_invert'],
                                                    argu['rule_key'])
+        cmd_slb_policy_action = None
+        if action_created:
+            if argu['action'] == lb_const.L7_POLICY_ACTION_REJECT:
+                cmd_slb_policy_action = ADCDevice.slb_policy_action(argu['rule_id'],
+                    'block', err_number='402')
+            elif argu['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_URL:
+                cmd_slb_policy_action = ADCDevice.slb_policy_action(argu['rule_id'],
+                    'redirect', redirect_to_url=argu['redirect_url'])
+
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_create_rule, va_name)
+            self.run_cli_extend(base_rest_url, cmd_slb_policy_action, va_name)
 
-    def delete_l7_rule(self, argu):
+    def delete_l7_rule(self, argu, action_deleted=False):
         if not argu:
             LOG.error("In delete_l7_rule, it should not pass the None.")
             return
 
         va_name = self.get_va_name(argu)
         cmd_no_rule = ADCDevice.no_l7_rule(argu['rule_id'], argu['rule_type'])
+        cmd_no_slb_policy_action = None
+        if action_deleted:
+            cmd_no_slb_policy_action = ADCDevice.no_slb_policy_action(argu['rule_id'])
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_no_rule, va_name)
+            self.run_cli_extend(base_rest_url, cmd_no_slb_policy_action, va_name)
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
-        vlan_tag, va_name):
+        vlan_tag, pool_name, pool_address, va_name):
         in_interface = self.get_va_interface()
         if vlan_tag:
             in_interface = "vlan." + vlan_tag
 
         cmd_ha_group_id = ADCDevice.ha_group_id(HA_GROUP_ID)
         self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name)
+
+        cmd_ip_pool = ADCDevice.ip_pool(pool_name, pool_address)
+        self.run_cli_extend(base_rest_url, cmd_ip_pool, va_name)
 
         for unit_item in unit_list:
             unit_name = unit_item['name']
@@ -514,16 +514,18 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_synconfig_peer, va_name)
             self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name)
 
-        cmd_ha_group_fip = ADCDevice.ha_group_fip(HA_GROUP_ID, vip_address, in_interface)
+        cmd_ha_group_fip_vip = ADCDevice.ha_group_fip(HA_GROUP_ID, vip_address, in_interface)
+        cmd_ha_group_fip_pool = ADCDevice.ha_group_fip(HA_GROUP_ID, pool_address, in_interface)
         cmd_ha_link_network_on = ADCDevice.ha_link_network_on()
         cmd_ha_group_enable = ADCDevice.ha_group_enable(HA_GROUP_ID)
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
-        cmd_ha_on = ADCDevice.ha_on()
-        self.run_cli_extend(base_rest_url, cmd_ha_group_fip, va_name)
+        cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
+        self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
 
 
     def clear_ha(self, base_rest_url, unit_list, vip_address, va_name):
@@ -620,6 +622,7 @@ class ArrayCommonAPIDriver(object):
                                   verify=False)
                 LOG.debug("status_code: %d", r.status_code)
                 if r.status_code == 200:
+                    time.sleep(1)
                     return r
                 else:
                     time.sleep(conn_retry_interval)
