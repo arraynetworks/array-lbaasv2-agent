@@ -64,6 +64,16 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ip_pool(pool_name, ip_address):
+        cmd = "ip pool %s %s" % (pool_name, ip_address)
+        return cmd
+
+    @staticmethod
+    def no_ip_pool(pool_name):
+        cmd = "no ip pool %s" % pool_name
+        return cmd
+
+    @staticmethod
     def no_ip(interface):
         cmd = "no ip address %s" % interface
         return cmd
@@ -229,6 +239,21 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def slb_policy_action(policy_name, action, redirect_to_url = None,
+        err_number = None):
+        cmd = None
+        if action == 'redirect':
+            cmd = "slb policy action %s %s %s" % (action, policy_name, redirect_to_url)
+        elif action == 'block':
+            cmd = "slb policy action %s %s %s" % (action, policy_name, err_number)
+        return cmd
+
+    @staticmethod
+    def no_slb_policy_action(policy_name):
+        cmd = "no slb policy action %s" % policy_name
+        return cmd
+
+    @staticmethod
     def create_real_server(member_name,
                            member_address,
                            member_port,
@@ -388,17 +413,17 @@ class ADCDevice(object):
             if key:
                 v_key = "\<regex\>%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_STARTS_WITH:
-            v_str = "^%s" % value
+            v_str = "\<regex\>^%s" % value
             if key:
-                v_key = "^%s" % key
+                v_key = "\<regex\>^%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_ENDS_WITH:
-            v_str = "%s$" % value
+            v_str = "\<regex\>%s$" % value
             if key:
-                v_key = "%s$" % key
+                v_key = "\<regex\>%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_EQUAL_TO:
-            v_str = "^%s$" % value
+            v_str = "\<regex\>^%s$" % value
             if key:
-                v_key = "^%s$" % key
+                v_key = "\<regex\>^%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
             v_str = value
             if key:
@@ -407,7 +432,7 @@ class ADCDevice(object):
         if rule_type == lb_const.L7_RULE_TYPE_COOKIE:
             v_str = "%s=%s" % (v_key, value)
         elif rule_type == lb_const.L7_RULE_TYPE_FILE_TYPE:
-            v_str = "\.%s$" % value
+            v_str = "\<regex\>\.%s$" % value
 
         if invert:
             v_str = "!%s" % v_str
@@ -459,6 +484,16 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def slb_proxyip_group(group_name, ip_pool_name):
+        cmd = "slb proxyip group %s %s" % (group_name, ip_pool_name)
+        return cmd
+
+    @staticmethod
+    def no_slb_proxyip_group(group_name, ip_pool_name):
+        cmd = "no slb proxyip group %s %s" % (group_name, ip_pool_name)
+        return cmd
+
+    @staticmethod
     def synconfig_peer(name, ip_address):
         cmd = "synconfig peer @@%s@@ %s" % (name, ip_address)
         return cmd
@@ -506,6 +541,11 @@ class ADCDevice(object):
     @staticmethod
     def ha_group_preempt_on(group_id):
         cmd = "ha group preempt on %d" % group_id
+        return cmd
+
+    @staticmethod
+    def ha_ssf_on():
+        cmd = "ha ssf on"
         return cmd
 
     @staticmethod
