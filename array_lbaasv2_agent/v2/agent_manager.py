@@ -93,7 +93,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         try:
             self.driver.update_member_status(self.agent_host)
         except Exception as e:
-            LOG.debug("failed to update member status: %s" % e.msg)
+            LOG.debug("failed to update member status: %s" % e.message)
 
     def _report_state(self):
         LOG.info("entering _report_state");
@@ -272,7 +272,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             self.plugin_rpc.l7rule_deleting_completion(context, obj)
         except ArrayADCException as e:
             LOG.exception('could not delete l7rule: %s, %s', obj['id'], e.msg)
-            self.plugin_rpc.l7rule_failed_completion(context, obj)
+            self.plugin_rpc.l7rule_deleting_completion(context, obj)
 
     @log_helpers.log_method_call
     def create_l7policy(self, context, obj):
