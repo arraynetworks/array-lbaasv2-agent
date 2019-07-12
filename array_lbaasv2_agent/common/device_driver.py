@@ -476,13 +476,15 @@ class ArrayADCDriver(object):
         if policy_changed or need_recreate:
             LOG.debug("Delete all rules from old policy in update_l7_rule")
             self.delete_all_rules(old_policy)
-            LOG.debug("Delete all rules from new policy in update_l7_rule")
-            self.delete_all_rules(policy)
+            if policy_changed:
+                LOG.debug("Delete all rules from new policy in update_l7_rule")
+                self.delete_all_rules(policy)
 
-            LOG.debug("Create all rules from old policy in update_l7_rule")
-            self.create_all_rules(policy, filt=rule['id'])
             LOG.debug("Create all rules from new policy in update_l7_rule")
             self.create_all_rules(policy)
+            if policy_changed:
+                LOG.debug("Create all rules from old policy in update_l7_rule")
+                self.create_all_rules(old_policy)
             argu['vip_id'] = policy['listener']['loadbalancer_id']
             self.driver.write_memory(argu)
 
