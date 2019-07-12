@@ -19,6 +19,7 @@ import logging
 import copy
 
 from neutron_lbaas.services.loadbalancer import constants as lb_const
+from array_lbaasv2_agent.common.exceptions import ArrayADCException
 
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
 from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
@@ -605,9 +606,12 @@ class ArrayADCDriver(object):
             argu['group_id'] = policy['redirect_pool']['id']
         else:
             argu['group_id'] = policy['listener']['default_pool_id']
-
-        if policy['action'] == lb_const.L7_POLICY_ACTION_REJECT:
-            argu['group_id'] = policy['id']
+            if not argu['group_id']:
+                pools = listener['loadbalancer']['pools']
+                if not pools:
+                    msg = "It should create pool before creating l7rule"
+                    raise ArrayADCException(msg)
+                argu['group_id'] = pools[0]['id']
 
         if cnt == 0:
             LOG.debug("No any rule needs to be created.")
@@ -640,6 +644,12 @@ class ArrayADCDriver(object):
                         argu['group_id'] = policy['redirect_pool']['id']
                     else:
                         argu['group_id'] = policy['listener']['default_pool_id']
+                        if not argu['group_id']:
+                            pools = listener['loadbalancer']['pools']
+                            if not pools:
+                                msg = "It should create pool before creating l7rule"
+                                raise ArrayADCException(msg)
+                            argu['group_id'] = pools[0]['id']
                     if cnt == 2:
                         argu['vs_id'] = vlinks[0];
                     else:
