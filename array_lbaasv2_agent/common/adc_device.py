@@ -14,6 +14,15 @@
 from array_lbaasv2_agent.common.adc_map import service_group_lb_method
 from array_lbaasv2_agent.common.adc_map import array_protocol_map
 from neutron_lbaas.services.loadbalancer import constants as lb_const
+from oslo_config import cfg
+
+
+def is_driver_apv():
+    driver_type = cfg.CONF.arraynetworks.array_device_driver
+    if driver_type == "array_lbaasv2_agent.common.apv_driver.ArrayAPVAPIDriver":
+        return True
+    else:
+        return False
 
 def parse_dest_url(dest_url):
     dest_prot = 'http'
@@ -39,6 +48,46 @@ class ADCDevice(object):
     """
 
     @staticmethod
+    def create_segment(segment_name):
+        cmd = "segment name %s" % (segment_name)
+        return cmd
+
+    @staticmethod
+    def delete_segment(segment_name):
+        cmd = "no segment name %s \nYES\n" % (segment_name)
+        return cmd
+
+    @staticmethod
+    def create_segment_user(segment_user, segment_name, segment_passwd, level):
+        cmd = "segment user %s %s %s %s" % (segment_user, segment_name, segment_passwd, level)
+        return cmd
+
+    @staticmethod
+    def delete_segment_user(segment_user):
+        cmd = "no segment user %s" % (segment_user)
+        return cmd
+
+    @staticmethod
+    def segment_interface(segment_name, if_name):
+        cmd = "segment interface %s %s" % (segment_name, if_name)
+        return cmd
+
+    @staticmethod
+    def segment_nat(segment_name, internal_ip, segment_ip, netmask):
+        cmd = "segment nat %s %s %s %s" % (segment_name, internal_ip, segment_ip, netmask)
+        return cmd
+
+    @staticmethod
+    def delete_segment_nat(segment_name, internal_ip, segment_ip, netmask):
+        cmd = "no segment nat %s %s %s %s" % (segment_name, internal_ip, segment_ip, netmask)
+        return cmd
+
+    @staticmethod
+    def delete_segment_interface(segment_name, if_name):
+        cmd = "no segment interface %s %s" % (segment_name, if_name)
+        return cmd
+
+    @staticmethod
     def vlan_device(interface, vlan_device_name, vlan_tag):
         cmd = "vlan %s %s %s" % (interface, vlan_device_name, vlan_tag)
         return cmd
@@ -54,8 +103,18 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def configure_segment_ip(interface, ip_address, netmask, internal_ip):
+        cmd = "segment ip address %s %s %s %s" % (interface, ip_address, netmask, internal_ip)
+        return cmd
+
+    @staticmethod
     def configure_route(gateway_ip):
         cmd = "ip route default %s" % (gateway_ip)
+        return cmd
+
+    @staticmethod
+    def configure_route_apv(ip_address, netmask, gateway_ip):
+        cmd = "ip route static %s %s %s" % (ip_address, netmask, gateway_ip)
         return cmd
 
     @staticmethod
@@ -75,8 +134,12 @@ class ADCDevice(object):
 
     @staticmethod
     def no_ip(interface):
-        cmd = "no ip address %s" % interface
+        if is_driver_apv():
+            cmd = "no segment ip address %s" % interface
+        else:
+            cmd = "no ip address %s" % interface
         return cmd
+
 
     @staticmethod
     def create_virtual_service(name, vip, port, proto, conn_limit):
@@ -297,7 +360,12 @@ class ADCDevice(object):
             hm_type = 'ICMP'
         cmd = None
         if hm_type == 'HTTP' or hm_type == 'HTTPS':
-            cmd = "slb health %s %s %s %s 3 %s %s @@%s@@ @@%s@@" % (hm_name, hm_type.lower(), \
+            if is_driver_apv():
+                cmd = "slb health %s %s %s %s 3 %s %s \"%s\" \"%s\"" % (hm_name, hm_type.lower(), \
+                    str(hm_delay), str(hm_timeout), str(hm_max_retries), \
+                    hm_http_method, hm_url, str(hm_expected_codes))
+            else:
+                cmd = "slb health %s %s %s %s 3 %s %s @@%s@@ @@%s@@" % (hm_name, hm_type.lower(), \
                     str(hm_delay), str(hm_timeout), str(hm_max_retries), \
                     hm_http_method, hm_url, str(hm_expected_codes))
         else:
@@ -389,7 +457,11 @@ class ADCDevice(object):
     @staticmethod
     def redirect_to_url(vs_name, policy_name, dest_url):
         (proto, host, path) = parse_dest_url(dest_url)
-        cmd = "http redirect url %s %s 1 @@\<regex\>.*@@ @@\<regex\>.*@@ @@%s@@ @@%s@@ @@%s@@ 302" % \
+        if is_driver_apv():
+            cmd = "http redirect url %s %s 1 \"\<regex\>.*\" \"\<regex\>.*\" \"%s\" \"%s\" \"%s\" 302" % \
+                (vs_name, policy_name, proto, host, path)
+        else:
+            cmd = "http redirect url %s %s 1 @@\<regex\>.*@@ @@\<regex\>.*@@ @@%s@@ @@%s@@ @@%s@@ 302" % \
                 (vs_name, policy_name, proto, host, path)
         return cmd
 
@@ -438,9 +510,15 @@ class ADCDevice(object):
             v_str = "!%s" % v_str
 
         if rule_type == lb_const.L7_RULE_TYPE_HEADER:
-            cmd += " %s %s %s @@%s@@ @@%s@@ 1" % (rule_id, vs_id, group_id, key, v_str)
+            if is_driver_apv():
+                cmd += " %s %s %s \"%s\" \"%s\" 1" % (rule_id, vs_id, group_id, key, v_str)
+            else:
+                cmd += " %s %s %s @@%s@@ @@%s@@ 1" % (rule_id, vs_id, group_id, key, v_str)
         else:
-            cmd += " %s %s %s @@%s@@ 1" % (rule_id, vs_id, group_id, v_str)
+            if is_driver_apv():
+                cmd += " %s %s %s \"%s\" 1" % (rule_id, vs_id, group_id, v_str)
+            else:
+                cmd += " %s %s %s @@%s@@ 1" % (rule_id, vs_id, group_id, v_str)
         return cmd
 
     @staticmethod
@@ -475,12 +553,18 @@ class ADCDevice(object):
 
     @staticmethod
     def ha_unit(name, ip_address, port):
-        cmd = "ha unit @@%s@@ %s %s" % (name, ip_address, port)
+        if is_driver_apv():
+            cmd = "ha unit \"%s\" %s %s" % (name, ip_address, port)
+        else:
+            cmd = "ha unit @@%s@@ %s %s" % (name, ip_address, port)
         return cmd
 
     @staticmethod
     def no_ha_unit(name):
-        cmd = "no ha unit @@%s@@" % name
+        if is_driver_apv():
+            cmd = "no ha unit \"%s\"" % name
+        else:
+            cmd = "no ha unit @@%s@@" % name
         return cmd
 
     @staticmethod
@@ -495,7 +579,10 @@ class ADCDevice(object):
 
     @staticmethod
     def synconfig_peer(name, ip_address):
-        cmd = "synconfig peer @@%s@@ %s" % (name, ip_address)
+        if is_driver_apv():
+            cmd = "synconfig peer \"%s\" %s" % (name, ip_address)
+        else:
+            cmd = "synconfig peer @@%s@@ %s" % (name, ip_address)
         return cmd
 
     @staticmethod
@@ -554,8 +641,17 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ha_group_fip_apv(group_id, ip_address, segment_name, port_name):
+        cmd = "segment ha group fip %d %s %s %s" % (group_id, ip_address, segment_name, port_name)
+        return cmd
+
+    @staticmethod
     def ha_no_group_fip(group_id, ip_address):
         cmd = "no ha group fip %d %s" % (group_id, ip_address)
+        return cmd
+    @staticmethod
+    def ha_no_group_fip_apv(group_id, ip_address, segment_name):
+        cmd = "no segment ha group fip %d %s %s" % (group_id, ip_address, segment_name)
         return cmd
 
     @staticmethod

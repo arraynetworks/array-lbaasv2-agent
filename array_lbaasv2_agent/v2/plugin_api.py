@@ -188,4 +188,21 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_members_status_on_agent',
             agent_host_name=agent_host_name)
+    def get_clusterids_by_subnet(self, context, subnet_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_cluster_id_by_subnet_id',
+            subnet_id=subnet_id)
 
+    def get_available_internal_ip(self, context, segment_name, segment_ip):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_available_internal_ip',
+            seg_name=segment_name, seg_ip=segment_ip)
+
+    def get_internal_ip_by_lb(self, context, segment_name, segment_ip):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_internal_ip_by_lb',
+            seg_name=segment_name, seg_ip=segment_ip)
+
+    def get_interface(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_interface')
