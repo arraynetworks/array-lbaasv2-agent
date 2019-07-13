@@ -363,22 +363,22 @@ class ADCDevice(object):
     @staticmethod
     def create_http_error_page(vs_name):
         #FIXME
-        cmd = "http import error 456 %s http://10.8.1.23/xx.html" % vs_name
+        cmd = "http import error 403 %s http://10.8.1.23/xx.html" % vs_name
         return cmd
 
     @staticmethod
     def load_http_error_page():
-        cmd = "http error 456 default"
+        cmd = "http error 403 default"
         return cmd
 
     @staticmethod
     def no_error_page(vs_name):
-        cmd = "no http import error 456 %s" % vs_name
+        cmd = "no http import error 403 %s" % vs_name
         return cmd
 
     @staticmethod
     def no_load_error_page():
-        cmd = "no http error 456 default"
+        cmd = "no http error 403 default"
         return cmd
 
     @staticmethod

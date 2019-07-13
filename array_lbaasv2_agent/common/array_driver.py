@@ -470,7 +470,7 @@ class ArrayCommonAPIDriver(object):
             if argu['action'] == lb_const.L7_POLICY_ACTION_REJECT:
                 cmd_load_error_page = ADCDevice.load_http_error_page()
                 cmd_slb_policy_action = ADCDevice.slb_policy_action(argu['rule_id'],
-                    'block', err_number='456')
+                    'block', err_number='403')
             elif argu['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_URL:
                 cmd_slb_policy_action = ADCDevice.slb_policy_action(argu['rule_id'],
                     'redirect', redirect_to_url=argu['redirect_url'])
