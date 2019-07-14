@@ -86,10 +86,16 @@ class ArrayCommonAPIDriver(object):
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
                     argu['vlan_tag'], argu['gateway'], va_name)
                 unit_list.append(unit_item)
-            for base_rest_url in self.base_rest_urls:
+            for idx, base_rest_url in enumerate(self.base_rest_urls):
+                if idx == 0:
+                    peer_host = self.hostnames[1]
+                else:
+                    peer_host = self.hostnames[0]
+                peer_ip_address = interface_mapping[peer_host]['address']
                 self.configure_ha(base_rest_url, unit_list,
                     argu['vip_address'], argu['vlan_tag'],
-                    pool_name, argu['pool_address'], va_name)
+                    pool_name, argu['pool_address'], peer_ip_address,
+                    va_name)
 
         self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
             argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
@@ -495,7 +501,7 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_no_slb_policy_action, va_name)
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
-        vlan_tag, pool_name, pool_address, va_name):
+        vlan_tag, pool_name, pool_address, peer_ip_address, va_name):
         in_interface = self.get_va_interface()
         if vlan_tag:
             in_interface = "vlan." + vlan_tag
@@ -522,12 +528,14 @@ class ArrayCommonAPIDriver(object):
         cmd_ha_link_network_on = ADCDevice.ha_link_network_on()
         cmd_ha_group_enable = ADCDevice.ha_group_enable(HA_GROUP_ID)
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
+        cmd_ha_ssf_peer = ADCDevice.ha_ssf_peer(peer_ip_address)
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
 
 
