@@ -153,14 +153,14 @@ class ArrayADCDriver(object):
 
             port_name = lb['id'] + "_pool"
             ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
-                subnet_id, port_name, hostname)
+                subnet_id, port_name, hostname, lb['id'])
             argu['pool_address'] = ip_pool_port['fixed_ips'][0]['ip_address']
             for host in self.hosts:
                 interfaces = {}
                 port_name = 'lb' + '-'+ lb['id'] + "_" + str(cnt)
                 cnt += 1
                 port = self.plugin_rpc.create_port_on_subnet(self.context,
-                    subnet_id, port_name, hostname)
+                    subnet_id, port_name, hostname, lb['id'])
                 interfaces['address'] = port['fixed_ips'][0]['ip_address']
                 interfaces['port_id'] = port['id']
                 interface_mapping[host] = interfaces

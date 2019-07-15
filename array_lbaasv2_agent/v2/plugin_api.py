@@ -118,11 +118,12 @@ class ArrayPluginApi(object):
         return cctxt.call(context, 'hm_deleting_completion', obj=obj)
 
     def create_port_on_subnet(self, context, subnet_id, name, host,
-            fixed_address_count=1):
+            device_id, fixed_address_count=1):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'create_port_on_subnet',
-                subnet_id=subnet_id, name=name, host=host,
-                fixed_address_count=fixed_address_count)
+            subnet_id=subnet_id, name=name, host=host,
+            device_id=device_id,
+            fixed_address_count=fixed_address_count)
 
     def get_subnet(self, context, subnet_id):
         cctxt = self.client.prepare()
