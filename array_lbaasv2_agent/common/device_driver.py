@@ -251,6 +251,7 @@ class ArrayADCDriver(object):
             argu['pool_id'] = None
 
         self.driver.create_listener(argu)
+        self.driver.write_memory(argu)
 
 
     def update_listener(self, obj, old_obj):
@@ -316,6 +317,7 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.create_pool(argu)
+        self.driver.write_memory(argu)
 
 
     def update_pool(self, obj, old_obj):
@@ -386,6 +388,7 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
         self.driver.create_member(argu)
+        self.driver.write_memory(argu)
 
     def update_member(self, obj, old_obj):
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Member_of_a_Pool
@@ -423,6 +426,7 @@ class ArrayADCDriver(object):
         argu['pool_id'] = hm['pool']['id']
         argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.create_health_monitor(argu)
+        self.driver.write_memory(argu)
 
     def update_health_monitor(self, obj, old_obj):
         need_recreate = False

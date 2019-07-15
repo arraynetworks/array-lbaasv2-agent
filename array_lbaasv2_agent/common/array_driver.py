@@ -465,15 +465,17 @@ class ArrayCommonAPIDriver(object):
                                                    argu['rule_invert'],
                                                    argu['rule_key'])
         cmd_slb_policy_action = None
+        cmd_load_error_page = None
         if action_created:
             if argu['action'] == lb_const.L7_POLICY_ACTION_REJECT:
                 cmd_slb_policy_action = ADCDevice.slb_policy_action(argu['rule_id'],
-                    'block', err_number='402')
+                    'block', err_number='456')
             elif argu['action'] == lb_const.L7_POLICY_ACTION_REDIRECT_TO_URL:
                 cmd_slb_policy_action = ADCDevice.slb_policy_action(argu['rule_id'],
                     'redirect', redirect_to_url=argu['redirect_url'])
 
         for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_load_error_page, va_name)
             self.run_cli_extend(base_rest_url, cmd_create_rule, va_name)
             self.run_cli_extend(base_rest_url, cmd_slb_policy_action, va_name)
 

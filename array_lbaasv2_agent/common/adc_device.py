@@ -54,7 +54,7 @@ class ADCDevice(object):
 
     @staticmethod
     def delete_segment(segment_name):
-        cmd = "no segment name %s \nYES\n" % (segment_name)
+        cmd = "no segment name %s" % (segment_name)
         return cmd
 
     @staticmethod
@@ -134,12 +134,13 @@ class ADCDevice(object):
 
     @staticmethod
     def no_ip(interface):
-        if is_driver_apv():
-            cmd = "no segment ip address %s" % interface
-        else:
-            cmd = "no ip address %s" % interface
+        cmd = "no ip address %s" % interface
         return cmd
 
+    @staticmethod
+    def no_segment_ip(interface, ip_type):
+        cmd = "no segment ip address %s %d" % (interface, ip_type)
+        return cmd
 
     @staticmethod
     def create_virtual_service(name, vip, port, proto, conn_limit):
