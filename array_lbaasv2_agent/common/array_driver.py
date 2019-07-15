@@ -73,25 +73,38 @@ class ArrayCommonAPIDriver(object):
             for idx, host in enumerate(self.hostnames):
                 unit_item = {}
                 ip_address = interface_mapping[host]['address']
-                unit_item['ip_address'] = ip_address
+                base_rest_url = self.base_rest_urls[idx]
+                self._create_vip(base_rest_url, ip_address, argu['netmask'],
+                    argu['vlan_tag'], argu['gateway'], va_name)
                 if idx == 0:
+                    if cfg.CONF.arraynetworks.bonding:
+                        ip_address = "2.2.2.2"
                     unit_item['priority'] = 100
                     unit_item['name'] = argu['vip_id'][:6] + '_p'
                     pri_port_id = interface_mapping[host]['port_id']
                 elif idx == 1:
+                    if cfg.CONF.arraynetworks.bonding:
+                        ip_address = "2.2.2.3"
                     sec_port_id = interface_mapping[host]['port_id']
                     unit_item['name'] = argu['vip_id'][:6] + '_s'
                     unit_item['priority'] = 90
-                base_rest_url = self.base_rest_urls[idx]
-                self._create_vip(base_rest_url, ip_address, argu['netmask'],
-                    argu['vlan_tag'], argu['gateway'], va_name)
+                unit_item['ip_address'] = ip_address
+                if cfg.CONF.arraynetworks.bonding:
+                    self._configure_ip(base_rest_url, ip_address, "255.255.255.0", va_name)
                 unit_list.append(unit_item)
             for idx, base_rest_url in enumerate(self.base_rest_urls):
-                if idx == 0:
-                    peer_host = self.hostnames[1]
+                peer_ip_address = None
+                if not cfg.CONF.arraynetworks.bonding:
+                    if idx == 0:
+                        peer_host = self.hostnames[1]
+                    else:
+                        peer_host = self.hostnames[0]
+                    peer_ip_address = interface_mapping[peer_host]['address']
                 else:
-                    peer_host = self.hostnames[0]
-                peer_ip_address = interface_mapping[peer_host]['address']
+                    if idx == 0:
+                        peer_ip_address = "2.2.2.3"
+                    else:
+                        peer_ip_address = "2.2.2.2"
                 self.configure_ha(base_rest_url, unit_list,
                     argu['vip_address'], argu['vlan_tag'],
                     pool_name, argu['pool_address'], peer_ip_address,
@@ -128,8 +141,10 @@ class ArrayCommonAPIDriver(object):
             vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, argu['vip_id'])
             pool_port_name = argu['vip_id'] + "_pool"
             self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
-            self.plugin_rpc.delete_port(self.context, vapv['pri_port_id'])
-            self.plugin_rpc.delete_port(self.context, vapv['sec_port_id'])
+            port_name = 'lb' + '-'+ argu['vip_id'] + "_0"
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+            port_name = 'lb' + '-'+ argu['vip_id'] + "_1"
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
         # Delete the apv from database
         self.plugin_rpc.delete_vapv(self.context, va_name)
@@ -166,6 +181,11 @@ class ArrayCommonAPIDriver(object):
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
                                 argu['lb_algorithm'], va_name)
 
+
+    def _configure_ip(self, base_rest_url, ip_address, netmask, va_name):
+        interface_name = "port3"
+        cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, ip_address, netmask)
+        self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name):
         """ create vip"""
