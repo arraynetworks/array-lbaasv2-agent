@@ -351,6 +351,9 @@ class ArrayCommonAPIDriver(object):
             if len(self.hostnames) > 1:
                 self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
                 self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
+                LOG.debug("In create_pool, waiting for enable ha")
+                time.sleep(10)
+                LOG.debug("In create_pool, done for waiting for enable ha")
 
         # create policy
         if argu['listener_id']:
@@ -566,6 +569,9 @@ class ArrayCommonAPIDriver(object):
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
         cmd_ha_ssf_peer = ADCDevice.ha_ssf_peer(peer_ip_address)
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
+        cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name()
+        cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member()
+        cmd_ha_decision_rule = ADCDevice.ha_decision_rule()
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name)
@@ -573,6 +579,10 @@ class ArrayCommonAPIDriver(object):
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name)
+        for cli in cmd_monitor_vcondition_member:
+            self.run_cli_extend(base_rest_url, cli, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name)
 
 
     def clear_ha(self, base_rest_url, unit_list, vip_address, va_name):

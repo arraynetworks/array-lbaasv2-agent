@@ -588,6 +588,23 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def monitor_vcondition_name():
+        cmd = "monitor vcondition name rule1 VCONDITION_1 AND"
+        return cmd
+
+    @staticmethod
+    def monitor_vcondition_member():
+        cmd = []
+        cmd.append("monitor vcondition member rule1 PORT_1")
+        cmd.append("monitor vcondition member rule1 PORT_2")
+        return cmd
+
+    @staticmethod
+    def ha_decision_rule():
+        cmd = "ha decision rule rule1 Group_Failover 1"
+        return cmd
+
+    @staticmethod
     def write_memory():
         cmd = "write memory"
         return cmd
