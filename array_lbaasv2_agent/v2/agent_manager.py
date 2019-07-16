@@ -116,6 +116,9 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         except ArrayADCException as e:
             LOG.exception('could not create loadbalancer: %s', e.msg)
             self.plugin_rpc.lb_failed_completion(context, obj)
+        except Exception as e:
+            LOG.exception('failed to create loadbalancer: %s', e.message)
+            self.plugin_rpc.lb_failed_completion(context, obj)
 
     @log_helpers.log_method_call
     def update_loadbalancer(self, context, obj, old_obj):

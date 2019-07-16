@@ -62,6 +62,7 @@ class ArrayCommonAPIDriver(object):
         va_name = self.get_va_name(argu)
         pri_port_id = None
         sec_port_id = None
+        vlan_tag = 0
         # create vip
         if len(self.hostnames) == 1:
             self._create_vip(self.base_rest_urls, argu['vip_address'],
@@ -90,7 +91,11 @@ class ArrayCommonAPIDriver(object):
                     unit_item['priority'] = 90
                 unit_item['ip_address'] = ip_address
                 if cfg.CONF.arraynetworks.bonding:
-                    self._configure_ip(base_rest_url, ip_address, "255.255.255.0", va_name)
+                    vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
+                    if vlan_tag_map:
+                        vlan_tag = vlan_tag_map['vlan_tag']
+                    self._configure_ip(base_rest_url, vlan_tag, ip_address,
+                        "255.255.255.0", va_name)
                 unit_list.append(unit_item)
             for idx, base_rest_url in enumerate(self.base_rest_urls):
                 peer_ip_address = None
@@ -112,7 +117,7 @@ class ArrayCommonAPIDriver(object):
 
         self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
             argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
-            sec_port_id=sec_port_id)
+            sec_port_id=sec_port_id, cluster_id=vlan_tag)
 
 
     def delete_loadbalancer(self, argu):
@@ -138,7 +143,6 @@ class ArrayCommonAPIDriver(object):
             for base_rest_url in self.base_rest_urls:
                 self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name)
 
-            vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, argu['vip_id'])
             pool_port_name = argu['vip_id'] + "_pool"
             self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
             port_name = 'lb' + '-'+ argu['vip_id'] + "_0"
@@ -182,9 +186,15 @@ class ArrayCommonAPIDriver(object):
                                 argu['lb_algorithm'], va_name)
 
 
-    def _configure_ip(self, base_rest_url, ip_address, netmask, va_name):
-        interface_name = "port3"
+    def _configure_ip(self, base_rest_url, vlan_tag, ip_address, netmask, va_name):
+        in_interface = "port3"
+        interface_name = in_interface
+        cmd_apv_config_vlan = None
+        if vlan_tag:
+            interface_name = "ha." + str(vlan_tag)
+            cmd_apv_config_vlan = ADCDevice.vlan_device(in_interface, interface_name, vlan_tag)
         cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, ip_address, netmask)
+        self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
         self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name):

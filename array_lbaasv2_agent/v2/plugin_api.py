@@ -161,6 +161,10 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_vapv')
 
+    def generate_tags(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'generate_tags')
+
     def get_va_name_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_va_name_by_lb_id', vip_id=vip_id)
@@ -170,11 +174,12 @@ class ArrayPluginApi(object):
         return cctxt.call(context, 'get_vapv_by_lb_id', vip_id=vip_id)
 
     def create_vapv(self, context, vapv_name, lb_id, subnet_id,
-        in_use_lb, pri_port_id, sec_port_id):
+        in_use_lb, pri_port_id, sec_port_id, cluster_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'create_vapv', vapv_name=vapv_name,
             lb_id=lb_id, subnet_id=subnet_id, pri_port_id=pri_port_id,
-            sec_port_id=sec_port_id, in_use_lb=in_use_lb)
+            sec_port_id=sec_port_id, in_use_lb=in_use_lb,
+            cluster_id=cluster_id)
 
     def delete_vapv(self, context, vapv_name):
         cctxt = self.client.prepare()
