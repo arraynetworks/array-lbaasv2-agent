@@ -154,7 +154,8 @@ class ArrayCommonAPIDriver(object):
 
         va_name = self.get_va_name(argu)
         # delete vs
-        self._delete_vs(argu['listener_id'], argu['protocol'], va_name)
+        self._delete_vs(argu['listener_id'], argu['protocol'],
+            argu['protocol_port'], va_name)
 
         if argu['pool_id']:
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
@@ -243,11 +244,9 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_create_vs, va_name)
 
 
-    def _delete_vs(self, listener_id, protocol, va_name):
-        cmd_apv_no_vs = ADCDevice.no_virtual_service(
-                                                     listener_id,
-                                                     protocol
-                                                    )
+    def _delete_vs(self, listener_id, protocol, port, va_name):
+        cmd_apv_no_vs = ADCDevice.no_virtual_service(listener_id,
+            protocol, port)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_vs, va_name)
 
@@ -309,6 +308,9 @@ class ArrayCommonAPIDriver(object):
             if len(self.hostnames) > 1:
                 self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
                 self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
+                LOG.debug("In create_pool, waiting for enable ha")
+                time.sleep(10)
+                LOG.debug("In create_pool, done for waiting for enable ha")
 
         # create policy
         if argu['listener_id']:
@@ -368,7 +370,8 @@ class ArrayCommonAPIDriver(object):
             return
 
         va_name = self.get_va_name(argu)
-        cmd_apv_no_rs = ADCDevice.no_real_server(argu['protocol'], argu['member_id'])
+        cmd_apv_no_rs = ADCDevice.no_real_server(argu['protocol'],
+            argu['member_id'], argu['member_port'])
 
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
@@ -644,8 +647,9 @@ class ArrayCommonAPIDriver(object):
 
     def get_all_health_status(self, va_name):
         status_dic = {}
+        host_dic = {}
         cmd_get_status = ADCDevice.get_health_status()
-        for base_rest_url in self.base_rest_urls:
+        for idx, base_rest_url in enumerate(self.base_rest_urls):
             r = self.run_cli_extend(base_rest_url, cmd_get_status, va_name)
             status_str_index = r.text.index("status")
             health_check_index = r.text.index("Health Check")
@@ -656,7 +660,9 @@ class ArrayCommonAPIDriver(object):
                      space_index = status.index(' ')
                      server_name = status[:space_index]
                      status_value = status[space_index:].strip()
-                     status_dic[server_name] = status_value
+                     host_dic[server_name] = status_value
+            host_name = self.hostnames[idx]
+            status_dic[host_name] = host_dic
         return status_dic
 
     def get_status_by_lb_mems(self, lb_mems):
@@ -666,11 +672,34 @@ class ArrayCommonAPIDriver(object):
             va_name = self.get_va_name(argu)
             all_status = self.get_all_health_status(va_name)
             LOG.debug("all_status: %s" % all_status)
+            all_status_values = all_status.values()
             for member_name, status in members.items():
                 if all_status.has_key(member_name):
                     if 'DOWN' in all_status[member_name]:
                         lb_mems[lb_id][member_name] = lb_const.OFFLINE
                     elif 'UP' in all_status[member_name]:
                         lb_mems[lb_id][member_name] = lb_const.ONLINE
+                if len(all_status_values) == 1:
+                    if all_status_values[0].has_key(member_name):
+                        if 'DOWN' in all_status_values[0][member_name]:
+                            lb_mems[lb_id][member_name] = lb_const.OFFLINE
+                        else:
+                            lb_mems[lb_id][member_name] = lb_const.ONLINE
+                elif len(all_status_values) > 1:
+                    if all_status_values[0].has_key(member_name) and \
+                        all_status_values[1].has_key(member_name):
+                        if 'DOWN' in all_status_values[0][member_name] and \
+                            'DOWN' in all_status_values[1][member_name]:
+                            lb_mems[lb_id][member_name] = lb_const.OFFLINE
+                        else:
+                            lb_mems[lb_id][member_name] = lb_const.ONLINE
         return lb_mems
+
+    def get_restful_status(self, base_rest_url):
+        cmd_show_ip_addr = ADCDevice.show_ip_addr()
+        try:
+            self.run_cli_extend(base_rest_url, cmd_show_ip_addr)
+        except Exception:
+            return False
+        return True
 

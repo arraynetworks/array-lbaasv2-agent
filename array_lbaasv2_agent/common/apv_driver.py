@@ -136,6 +136,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         va_name = self.get_va_name(argu)
         pri_port_id = None
         sec_port_id = None
+        argu['vlan_tag'] = 0
+        vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
+        if vlan_tag_map:
+            argu['vlan_tag']  = str(vlan_tag_map['vlan_tag'])
         lb_name = argu['vip_id']  #need verify
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
         # create vip
@@ -143,8 +147,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self._create_segment(self.base_rest_urls, lb_name, va_name)
             self._create_segment_user(self.base_rest_urls, lb_name, va_name)
             self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name)
-            # self._segment_nat(self.context, self.base_rest_urls, lb_name, argu['vip_address'], va_name)
-            ip_address = interface_mapping[self.hostnames]['address']
+            #self._segment_nat(self.context, self.base_rest_urls, lb_name, argu['vip_address'], va_name)
+            ip_address = argu['interface_mapping'][self.hostnames[0]]['address']
             self._create_vip(self.base_rest_urls, ip_address,
                 argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name)
             self.write_memory(argu, self.segment_enable)
@@ -169,7 +173,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 self._create_segment(self.base_rest_urls, lb_name, va_name)
                 self._create_segment_user(self.base_rest_urls, lb_name, va_name)
                 self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name)
-                # self._segment_nat(self.context, self.base_rest_urls, lb_name, argu['vip_address'], va_name)
+                #self._segment_nat(self.context, self.base_rest_urls, lb_name, argu['vip_address'], va_name)
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
                     argu['vlan_tag'], argu['gateway'], va_name, lb_name)
                 unit_list.append(unit_item)
@@ -179,7 +183,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 return 
             self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
                     argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
-                    sec_port_id=sec_port_id)
+                    sec_port_id=sec_port_id, cluster_id=vlan_tag_map['vlan_tag'])
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
                     argu['vip_address'], argu['vlan_tag'], lb_name, pool_name, 
@@ -215,14 +219,18 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             for base_rest_url in self.base_rest_urls:
                 self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name, self.context, argu['subnet_id'])
 
-            vapv = self.plugin_rpc.get_vapv_by_lb_id(self.context, argu['vip_id'])
             pool_port_name = argu['vip_id'] + "_pool"
             self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
-            self.plugin_rpc.delete_port(self.context, vapv['pri_port_id'])
-            self.plugin_rpc.delete_port(self.context, vapv['sec_port_id'])
+            port_name = 'lb' + '-'+ argu['vip_id'] + "_0"
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+            port_name = 'lb' + '-'+ argu['vip_id'] + "_1"
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
-        # Delete the apv from database
-        self.plugin_rpc.delete_vapv(self.context, lb_name[:10])
+            # Delete the apv from database
+            self.plugin_rpc.delete_vapv(self.context, lb_name[:10])
+        else:
+            port_name = argu['vip_id'] + "_port"
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name):
         """ create vip"""
@@ -243,16 +251,20 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.error("Failed to get available internal ip address")
             return
         cmd_apv_config_ip = ADCDevice.configure_segment_ip(interface_name, vip_address, netmask, internal_ip)
-        # ip_net = (IPy.IP(vip_address).make_net(netmask)).strNormal(0)
-        # cmd_apv_config_route = ADCDevice.configure_route_apv(ip_net, netmask, gateway)
+        ip_net = (IPy.IP(vip_address).make_net(netmask)).strNormal(0)
+        #cmd_apv_config_route = ADCDevice.configure_route_apv(ip_net, netmask, gateway)
+        cmd_ssh_ip = ADCDevice.ssh_ip(vip_address)
 
         if isinstance(base_rest_urls, list):
             for base_rest_url in base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name, self.segment_enable)
-                # self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+                #self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+                self.run_cli_extend(base_rest_url, cmd_ssh_ip, va_name)
         else:
             self.run_cli_extend(base_rest_urls, cmd_apv_config_ip, va_name, self.segment_enable)
-            # self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
+            #self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
+            self.run_cli_extend(base_rest_urls, cmd_ssh_ip, va_name)
+
 
 
     def _delete_vip(self, vlan_tag, va_name):
@@ -309,13 +321,20 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_ha_group_enable = ADCDevice.ha_group_enable(group_id)
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(group_id)
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
+        cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name()
+        cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member()
+        cmd_ha_decision_rule = ADCDevice.ha_decision_rule()
+
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name, self.segment_enable)
-
+        self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name, self.segment_enable)
+        for cli in cmd_monitor_vcondition_member:
+            self.run_cli_extend(base_rest_url, cli, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name, self.segment_enable)
 
     def clear_ha(self, base_rest_url, unit_list, vip_address, va_name, segment_name, context, vip_subnet_id):
         group_id = self.find_available_cluster_id(context, vip_subnet_id)
@@ -348,8 +367,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
-        conn_max_retries = 3
-        conn_retry_interval = 5
+        conn_max_retries = 2
+        conn_retry_interval = 3
         auth_value = self.get_auth()
         if not segment_enable:
             auth_value = self.get_segment_auth()

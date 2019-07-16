@@ -54,7 +54,7 @@ class ADCDevice(object):
 
     @staticmethod
     def delete_segment(segment_name):
-        cmd = "no segment name %s" % (segment_name)
+        cmd = "no segment name %s\nYES\n" % (segment_name)
         return cmd
 
     @staticmethod
@@ -128,6 +128,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ssh_ip(ip_address):
+        cmd = "ssh ip %s" % (ip_address)
+        return cmd
+
+    @staticmethod
     def no_ip_pool(pool_name):
         cmd = "no ip pool %s" % pool_name
         return cmd
@@ -144,18 +149,20 @@ class ADCDevice(object):
 
     @staticmethod
     def create_virtual_service(name, vip, port, proto, conn_limit):
-        protocol = array_protocol_map(proto)
+        protocol = array_protocol_map(proto, str(port))
         max_conn = conn_limit
         if max_conn == -1:
             max_conn = 0
-
-        cmd = "slb virtual %s %s %s %s arp %s" % (protocol, name, vip, port,
+        if protocol != 'ftp':
+            cmd = "slb virtual %s %s %s %s arp %s" % (protocol, name, vip, port,
                 max_conn)
+        else:
+            cmd = "slb virtual ftp %s %s %s %s" % (name, vip, port, max_conn)
         return cmd
 
     @staticmethod
-    def no_virtual_service(name, proto):
-        protocol = array_protocol_map(proto)
+    def no_virtual_service(name, proto, port):
+        protocol = array_protocol_map(proto, str(port))
         cmd = "no slb virtual %s %s" % (protocol, name)
         return cmd
 
@@ -323,14 +330,14 @@ class ADCDevice(object):
                            member_port,
                            proto
                           ):
-        protocol = array_protocol_map(proto)
+        protocol = array_protocol_map(proto, str(member_port))
         cmd = "slb real %s %s %s %s 65535 none" % (protocol, member_name,\
                 member_address, member_port)
         return cmd
 
     @staticmethod
-    def no_real_server(proto, member_name):
-        protocol = array_protocol_map(proto)
+    def no_real_server(proto, member_name, member_port):
+        protocol = array_protocol_map(proto, str(member_port))
         cmd = "no slb real %s %s" % (protocol, member_name)
         return cmd
 
@@ -675,6 +682,23 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def monitor_vcondition_name():
+        cmd = "monitor vcondition name rule1 VCONDITION_1 AND"
+        return cmd
+
+    @staticmethod
+    def monitor_vcondition_member():
+        cmd = []
+        cmd.append("monitor vcondition member rule1 PORT_1")
+        cmd.append("monitor vcondition member rule1 PORT_2")
+        return cmd
+
+    @staticmethod
+    def ha_decision_rule():
+        cmd = "ha decision rule rule1 Group_Failover 1"
+        return cmd
+
+    @staticmethod
     def write_memory():
         cmd = "write memory"
         return cmd
@@ -683,3 +707,14 @@ class ADCDevice(object):
     def get_health_status():
         cmd = "show health server"
         return cmd
+
+    @staticmethod
+    def show_ip_addr():
+        cmd = "show ip addr"
+        return cmd
+
+    @staticmethod
+    def show_ha_status():
+        cmd = "show ha status"
+        return cmd
+
