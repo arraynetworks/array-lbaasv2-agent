@@ -150,7 +150,7 @@ class ArrayCommonAPIDriver(object):
             port_name = 'lb' + '-'+ argu['vip_id'] + "_1"
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
         else:
-            pool_port_name = argu['vip_id'] + "_port"
+            port_name = argu['vip_id'] + "_port"
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
         # Delete the apv from database
@@ -236,7 +236,7 @@ class ArrayCommonAPIDriver(object):
                 self.run_cli_extend(base_rest_urls, cmd_apv_config_vlan, va_name)
             self.run_cli_extend(base_rest_urls, cmd_apv_config_ip, va_name)
             self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
-            self.run_cli_extend(base_rest_url, cmd_ssh_ip, va_name)
+            self.run_cli_extend(base_rest_urls, cmd_ssh_ip, va_name)
 
 
     def _delete_vip(self, vlan_tag, va_name):
