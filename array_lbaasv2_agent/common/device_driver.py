@@ -300,6 +300,7 @@ class ArrayADCDriver(object):
         argu['tenant_id'] = listener['tenant_id']
         argu['listener_id'] = listener['id']
         argu['protocol'] = listener['protocol']
+        argu['protocol_port'] = listener['protocol_port']
 
         lb = listener['loadbalancer']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
@@ -431,6 +432,7 @@ class ArrayADCDriver(object):
         argu['tenant_id'] = member['tenant_id']
         argu['member_id'] = member['id']
         argu['protocol'] = pool['protocol']
+        argu['member_port'] = member['protocol_port']
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
 
