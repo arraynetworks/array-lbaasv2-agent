@@ -17,8 +17,10 @@ from oslo_config import cfg
 from oslo_utils import importutils
 import logging
 import copy
+import six
+import time
 
-from neutron_lbaas.services.loadbalancer import constants as lb_const
+from neutron_lib import constants as n_const
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
 
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
@@ -117,6 +119,27 @@ class ArrayADCDriver(object):
         argu = {}
 
         port_id = lb['vip_port_id']
+
+        port_status = None
+        LOG.debug("Get the status of vip_port")
+        for a in six.moves.xrange(5):
+            ret_port = self.plugin_rpc.get_port(self.context, port_id)
+            if not ret_port:
+                msg = "Failed to get port by port_id %s" % port_id
+                raise ArrayADCException(msg)
+            LOG.debug("ret_port: --%s--", ret_port)
+            port_status = ret_port['status']
+            if port_status == n_const.PORT_STATUS_ERROR:
+                msg = "Failed to create port by the SDN controller"
+                raise ArrayADCException(msg)
+            elif port_status == n_const.PORT_STATUS_BUILD:
+                LOG.debug("The port is still building, so waiting...")
+                time.sleep(3)
+
+        if port_status == n_const.PORT_STATUS_ERROR or \
+            port_status == n_const.PORT_STATUS_BUILD:
+            msg = "Timeout to create port by the SDN controller"
+            raise ArrayADCException(msg)
 
         ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
         vlan_tag = ret_vlan['vlan_tag']
