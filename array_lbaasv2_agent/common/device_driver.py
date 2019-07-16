@@ -169,10 +169,10 @@ class ArrayADCDriver(object):
                     argu['network_type'] = network_type
 
         interface_mapping = {}
+        hostname = self.conf.arraynetworks.agent_host
         if len(self.hosts) > 1:
             cnt = 0
             LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
-            hostname = self.conf.arraynetworks.agent_host
 
             port_name = lb['id'] + "_pool"
             ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
@@ -187,6 +187,12 @@ class ArrayADCDriver(object):
                 interfaces['address'] = port['fixed_ips'][0]['ip_address']
                 interfaces['port_id'] = port['id']
                 interface_mapping[host] = interfaces
+        else:
+            port_name = lb['id'] + "_port"
+            ip_port = self.plugin_rpc.create_port_on_subnet(self.context,
+                subnet_id, port_name, hostname, lb['id'])
+            argu['ip_address'] = ip_port['fixed_ips'][0]['ip_address']
+
         argu['interface_mapping'] = interface_mapping
 
         argu['gateway'] = subnet['gateway_ip']

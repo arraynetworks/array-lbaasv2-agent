@@ -69,6 +69,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ssh_ip(ip_address):
+        cmd = "ssh ip %s" % (ip_address)
+        return cmd
+
+    @staticmethod
     def no_ip_pool(pool_name):
         cmd = "no ip pool %s" % pool_name
         return cmd
@@ -590,4 +595,9 @@ class ADCDevice(object):
     @staticmethod
     def get_health_status():
         cmd = "show health server"
+        return cmd
+
+    @staticmethod
+    def show_ip_addr():
+        cmd = "show ip addr"
         return cmd

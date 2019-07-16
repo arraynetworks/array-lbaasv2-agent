@@ -149,6 +149,9 @@ class ArrayCommonAPIDriver(object):
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
             port_name = 'lb' + '-'+ argu['vip_id'] + "_1"
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
+        else:
+            pool_port_name = argu['vip_id'] + "_port"
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
         # Delete the apv from database
         self.plugin_rpc.delete_vapv(self.context, va_name)
@@ -215,6 +218,7 @@ class ArrayCommonAPIDriver(object):
 
         cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
         cmd_apv_config_route = ADCDevice.configure_route(gateway)
+        cmd_ssh_ip = ADCDevice.ssh_ip(vip_address)
 
         if isinstance(base_rest_urls, list):
             for base_rest_url in base_rest_urls:
@@ -224,6 +228,7 @@ class ArrayCommonAPIDriver(object):
                     self.run_cli_extend(base_rest_url, cmd_apv_config_vlan, va_name)
                 self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name)
                 self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+                self.run_cli_extend(base_rest_url, cmd_ssh_ip, va_name)
         else:
             for cli in cmd_bond_interfaces:
                 self.run_cli_extend(base_rest_urls, cli, va_name)
@@ -231,6 +236,7 @@ class ArrayCommonAPIDriver(object):
                 self.run_cli_extend(base_rest_urls, cmd_apv_config_vlan, va_name)
             self.run_cli_extend(base_rest_urls, cmd_apv_config_ip, va_name)
             self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
+            self.run_cli_extend(base_rest_url, cmd_ssh_ip, va_name)
 
 
     def _delete_vip(self, vlan_tag, va_name):
@@ -652,8 +658,8 @@ class ArrayCommonAPIDriver(object):
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
-        conn_max_retries = 3
-        conn_retry_interval = 5
+        conn_max_retries = 2
+        conn_retry_interval = 3
         for a in six.moves.xrange(conn_max_retries):
             try:
                 r = requests.post(url,
@@ -712,4 +718,12 @@ class ArrayCommonAPIDriver(object):
                     elif 'UP' in all_status[member_name]:
                         lb_mems[lb_id][member_name] = lb_const.ONLINE
         return lb_mems
+
+    def get_restful_status(self, base_rest_url):
+        cmd_show_ip_addr = ADCDevice.show_ip_addr()
+        try:
+            self.run_cli_extend(base_rest_url, cmd_show_ip_addr)
+        except Exception:
+            return False
+        return True
 
