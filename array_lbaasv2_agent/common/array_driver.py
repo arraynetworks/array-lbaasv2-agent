@@ -63,6 +63,7 @@ class ArrayCommonAPIDriver(object):
         pri_port_id = None
         sec_port_id = None
         vlan_tag = 0
+        exception_lb = 0
         # create vip
         if len(self.hostnames) == 1:
             self._create_vip(self.base_rest_urls, argu['vip_address'],
@@ -75,8 +76,12 @@ class ArrayCommonAPIDriver(object):
                 unit_item = {}
                 ip_address = interface_mapping[host]['address']
                 base_rest_url = self.base_rest_urls[idx]
-                self._create_vip(base_rest_url, ip_address, argu['netmask'],
-                    argu['vlan_tag'], argu['gateway'], va_name)
+                try:
+                    self._create_vip(base_rest_url, ip_address, argu['netmask'],
+                        argu['vlan_tag'], argu['gateway'], va_name)
+                except Exception:
+                    LOG.debug("_create_vip: Exception is raised in idx(%d)" % idx)
+                    exception_lb = idx + 10
                 if idx == 0:
                     if cfg.CONF.arraynetworks.bonding:
                         ip_address = "2.2.2.2"
@@ -94,8 +99,12 @@ class ArrayCommonAPIDriver(object):
                     vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
                     if vlan_tag_map:
                         vlan_tag = vlan_tag_map['vlan_tag']
-                    self._configure_ip(base_rest_url, vlan_tag, ip_address,
-                        "255.255.255.0", va_name)
+                    try:
+                        self._configure_ip(base_rest_url, vlan_tag, ip_address,
+                            "255.255.255.0", va_name)
+                    except Exception:
+                        LOG.debug("_configure_vip: Exception is raised in idx(%d)" % idx)
+                        exception_lb = idx + 10
                 unit_list.append(unit_item)
             for idx, base_rest_url in enumerate(self.base_rest_urls):
                 peer_ip_address = None
@@ -110,13 +119,17 @@ class ArrayCommonAPIDriver(object):
                         peer_ip_address = "2.2.2.3"
                     else:
                         peer_ip_address = "2.2.2.2"
-                self.configure_ha(base_rest_url, unit_list,
-                    argu['vip_address'], argu['vlan_tag'],
-                    pool_name, argu['pool_address'], peer_ip_address,
-                    va_name)
+                try:
+                    self.configure_ha(base_rest_url, unit_list,
+                        argu['vip_address'], argu['vlan_tag'],
+                        pool_name, argu['pool_address'], peer_ip_address,
+                        va_name)
+                except Exception:
+                    LOG.debug("configure_ha: Exception is raised in idx(%d)" % idx)
+                    exception_lb = idx + 10
 
         self.plugin_rpc.create_vapv(self.context, va_name, argu['vip_id'],
-            argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
+            argu['subnet_id'], in_use_lb=exception_lb, pri_port_id=pri_port_id,
             sec_port_id=sec_port_id, cluster_id=vlan_tag)
 
 
@@ -539,6 +552,40 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_no_rule, va_name)
             self.run_cli_extend(base_rest_url, cmd_no_slb_policy_action, va_name)
 
+    def configure_basic_ha(self, base_rest_url, unit_list, va_name):
+        cmd_ha_group_id = ADCDevice.ha_group_id(HA_GROUP_ID)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name)
+
+        for unit_item in unit_list:
+            unit_name = unit_item['name']
+            ip_address = unit_item['ip_address']
+            priority = unit_item['priority']
+            cmd_ha_unit = ADCDevice.ha_unit(unit_name, ip_address, 65521)
+            cmd_synconfig_peer = ADCDevice.synconfig_peer(unit_name, ip_address)
+            cmd_ha_group_priority = ADCDevice.ha_group_priority(unit_name, HA_GROUP_ID, priority)
+            self.run_cli_extend(base_rest_url, cmd_ha_unit, va_name)
+            self.run_cli_extend(base_rest_url, cmd_synconfig_peer, va_name)
+            self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name)
+
+        cmd_ha_link_network_on = ADCDevice.ha_link_network_on()
+        cmd_ha_group_enable = ADCDevice.ha_group_enable(HA_GROUP_ID)
+        cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
+        cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
+        cmd_ha_synconfig_bootup_on = ADCDevice.ha_synconfig_bootup_on()
+        cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name()
+        cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member()
+        cmd_ha_decision_rule = ADCDevice.ha_decision_rule()
+        self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_synconfig_bootup_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name)
+        for cli in cmd_monitor_vcondition_member:
+            self.run_cli_extend(base_rest_url, cli, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name)
+
+
     def configure_ha(self, base_rest_url, unit_list, vip_address,
         vlan_tag, pool_name, pool_address, peer_ip_address, va_name):
         in_interface = self.get_va_interface()
@@ -569,6 +616,7 @@ class ArrayCommonAPIDriver(object):
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
         cmd_ha_ssf_peer = ADCDevice.ha_ssf_peer(peer_ip_address)
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
+        cmd_ha_synconfig_bootup_on = ADCDevice.ha_synconfig_bootup_on()
         cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name()
         cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member()
         cmd_ha_decision_rule = ADCDevice.ha_decision_rule()
@@ -579,6 +627,7 @@ class ArrayCommonAPIDriver(object):
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
+        self.run_cli_extend(base_rest_url, cmd_ha_synconfig_bootup_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name)
         for cli in cmd_monitor_vcondition_member:
             self.run_cli_extend(base_rest_url, cli, va_name)
@@ -646,7 +695,10 @@ class ArrayCommonAPIDriver(object):
         va_name = self.get_va_name(argu)
         cmd_apv_write_memory = ADCDevice.write_memory()
         for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_apv_write_memory, va_name)
+            try:
+                self.run_cli_extend(base_rest_url, cmd_apv_write_memory, va_name)
+            except Exception:
+                pass
 
 
     def activation_server(self, address, port, va_name):
@@ -749,4 +801,55 @@ class ArrayCommonAPIDriver(object):
         except Exception:
             return False
         return True
+
+    def recovery_va(self, base_rest_url, cur_idx, vapv):
+        #lb_dict = self.plugin_rpc.get_loadbalancer(self.context, vapv['lb_id'])
+        unit_list = []
+        LOG.debug("Try to recovery va(%s) in host(%s)" % (vapv['hostname'], self.hostnames[cur_idx]))
+
+        for idx in range(2):
+            unit_item = {}
+            if idx == 0:
+                if cfg.CONF.arraynetworks.bonding:
+                    ip_address = "2.2.2.2"
+                unit_item['priority'] = 100
+                unit_item['name'] = vapv['lb_id'][:6] + '_p'
+            elif idx == 1:
+                if cfg.CONF.arraynetworks.bonding:
+                    ip_address = "2.2.2.3"
+                unit_item['name'] = vapv['lb_id'][:6] + '_s'
+                unit_item['priority'] = 90
+            unit_item['ip_address'] = ip_address
+            unit_list.append(unit_item)
+            if idx == cur_idx:
+                vlan_tag = vapv['cluster_id']
+                self._configure_ip(base_rest_url, vlan_tag, ip_address,
+                    "255.255.255.0", vapv['hostname'])
+        try:
+            LOG.debug("unit_list: --%s--" % unit_list)
+            self.configure_basic_ha(base_rest_url, unit_list, vapv['hostname'])
+            self.plugin_rpc.update_excepted_vapv_by_name(self.context, vapv['hostname'])
+            cmd_apv_write_memory = ADCDevice.write_memory()
+            self.run_cli_extend(base_rest_url, cmd_apv_write_memory, vapv['hostname'])
+        except Exception as e:
+            LOG.debug("Still failed to recovery the va(%s): %s" % (vapv['hostname'], e.message))
+
+    def recovery_vas_configuration(self):
+        if len(self.hostnames) == 1:
+            LOG.debug("Don't need to recovery the vas.")
+            return
+
+        vapvs = self.plugin_rpc.get_excepted_vapvs(self.context)
+        if not vapvs:
+            LOG.debug("No any VAs need to be recoveried")
+            return
+        for vapv in vapvs:
+            idx = vapv['in_use_lb'] - 10
+            hostname = self.hostnames[idx]
+            base_rest_url = "https://" + hostname + ":9997/rest/avx"
+            connected = self.get_restful_status(base_rest_url)
+            if not connected:
+                LOG.debug("Failed to connect the AVX(%s)..." % hostname)
+                return
+            self.recovery_va(base_rest_url, idx, vapv)
 

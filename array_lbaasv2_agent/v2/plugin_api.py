@@ -185,6 +185,14 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'delete_vapv', vapv_name=vapv_name)
 
+    def update_excepted_vapv_by_name(self, context, vapv_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'update_excepted_vapv_by_name', va_name=vapv_name)
+
+    def get_excepted_vapvs(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_excepted_vapvs')
+
     def update_member_status(self, context, member_id, operating_status):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'update_member_status',

@@ -562,6 +562,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ha_synconfig_bootup_on():
+        cmd = "ha synconfig bootup on"
+        return cmd
+
+    @staticmethod
     def ha_group_fip(group_id, ip_address, port_name):
         cmd = "ha group fip %d %s %s" % (group_id, ip_address, port_name)
         return cmd

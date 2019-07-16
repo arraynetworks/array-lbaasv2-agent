@@ -205,6 +205,7 @@ class ArrayADCDriver(object):
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
         self.driver.create_loadbalancer(argu)
+        self.driver.write_memory(argu)
 
 
     def update_loadbalancer(self, obj, old_obj):
@@ -245,6 +246,7 @@ class ArrayADCDriver(object):
                     argu['network_type'] = network_type
 
         self.driver.delete_loadbalancer(argu)
+        self.driver.write_memory(argu)
 
 
     def get_stats(self, instance):
@@ -280,6 +282,7 @@ class ArrayADCDriver(object):
             argu['pool_id'] = None
 
         self.driver.create_listener(argu)
+        self.driver.write_memory(argu)
 
 
     def update_listener(self, obj, old_obj):
@@ -317,6 +320,7 @@ class ArrayADCDriver(object):
             argu['pool_id'] = None
 
         self.driver.delete_listener(argu)
+        self.driver.write_memory(argu)
 
 
     def create_pool(self, obj):
@@ -346,6 +350,7 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.create_pool(argu)
+        self.driver.write_memory(argu)
 
 
     def update_pool(self, obj, old_obj):
@@ -400,6 +405,7 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.delete_pool(argu)
+        self.driver.write_memory(argu)
 
     def create_member(self, obj):
         member = obj
@@ -416,6 +422,7 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
         self.driver.create_member(argu)
+        self.driver.write_memory(argu)
 
     def update_member(self, obj, old_obj):
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Member_of_a_Pool
@@ -437,6 +444,7 @@ class ArrayADCDriver(object):
         argu['vip_id'] = member['pool']['loadbalancer_id']
 
         self.driver.delete_member(argu)
+        self.driver.write_memory(argu)
 
     def create_health_monitor(self, obj):
         hm = obj
@@ -454,6 +462,7 @@ class ArrayADCDriver(object):
         argu['pool_id'] = hm['pool']['id']
         argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.create_health_monitor(argu)
+        self.driver.write_memory(argu)
 
     def update_health_monitor(self, obj, old_obj):
         need_recreate = False
@@ -474,6 +483,7 @@ class ArrayADCDriver(object):
         argu['pool_id'] = hm['pool']['id']
         argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.delete_health_monitor(argu)
+        self.driver.write_memory(argu)
 
     def create_l7rule(self, rule):
         argu = {}
