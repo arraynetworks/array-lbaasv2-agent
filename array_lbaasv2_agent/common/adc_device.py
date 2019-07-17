@@ -632,3 +632,8 @@ class ADCDevice(object):
         cmd = "show ha status"
         return cmd
 
+    @staticmethod
+    def synconfig_from_peer(peer_name):
+        cmd = "synconfig from %s" % peer_name
+        return cmd
+

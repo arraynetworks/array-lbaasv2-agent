@@ -552,7 +552,7 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_no_rule, va_name)
             self.run_cli_extend(base_rest_url, cmd_no_slb_policy_action, va_name)
 
-    def configure_basic_ha(self, base_rest_url, unit_list, va_name):
+    def configure_basic_ha(self, base_rest_url, unit_list, idx, va_name):
         cmd_ha_group_id = ADCDevice.ha_group_id(HA_GROUP_ID)
         self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name)
 
@@ -567,23 +567,10 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_synconfig_peer, va_name)
             self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name)
 
-        cmd_ha_link_network_on = ADCDevice.ha_link_network_on()
-        cmd_ha_group_enable = ADCDevice.ha_group_enable(HA_GROUP_ID)
-        cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
-        cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
-        cmd_ha_synconfig_bootup_on = ADCDevice.ha_synconfig_bootup_on()
-        cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name()
-        cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member()
-        cmd_ha_decision_rule = ADCDevice.ha_decision_rule()
-        self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_synconfig_bootup_on, va_name)
-        self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name)
-        for cli in cmd_monitor_vcondition_member:
-            self.run_cli_extend(base_rest_url, cli, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name)
+        unit_name = unit_list[idx]['name']
+        cmd_synconfig_from_peer = ADCDevice.synconfig_from_peer(unit_name)
+        self.run_cli_extend(base_rest_url, cmd_synconfig_from_peer, va_name,
+            connect_timeout=60, read_timeout=300)
 
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
@@ -616,7 +603,6 @@ class ArrayCommonAPIDriver(object):
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(HA_GROUP_ID)
         cmd_ha_ssf_peer = ADCDevice.ha_ssf_peer(peer_ip_address)
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
-        cmd_ha_synconfig_bootup_on = ADCDevice.ha_synconfig_bootup_on()
         cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name()
         cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member()
         cmd_ha_decision_rule = ADCDevice.ha_decision_rule()
@@ -627,7 +613,6 @@ class ArrayCommonAPIDriver(object):
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, va_name)
-        self.run_cli_extend(base_rest_url, cmd_ha_synconfig_bootup_on, va_name)
         self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name)
         for cli in cmd_monitor_vcondition_member:
             self.run_cli_extend(base_rest_url, cli, va_name)
@@ -827,7 +812,7 @@ class ArrayCommonAPIDriver(object):
                     "255.255.255.0", vapv['hostname'])
         try:
             LOG.debug("unit_list: --%s--" % unit_list)
-            self.configure_basic_ha(base_rest_url, unit_list, vapv['hostname'])
+            self.configure_basic_ha(base_rest_url, unit_list, cur_idx, vapv['hostname'])
             self.plugin_rpc.update_excepted_vapv_by_name(self.context, vapv['hostname'])
             cmd_apv_write_memory = ADCDevice.write_memory()
             self.run_cli_extend(base_rest_url, cmd_apv_write_memory, vapv['hostname'])
