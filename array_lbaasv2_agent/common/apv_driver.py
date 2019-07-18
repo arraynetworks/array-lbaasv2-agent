@@ -41,6 +41,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.segment_user_passwd = "click1"  #ToDo: get from configuration
         self.segment_enable = True
 
+
     def get_va_name(self, argu):
         return None
 
@@ -136,26 +137,23 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         va_name = self.get_va_name(argu)
         pri_port_id = None
         sec_port_id = None
-        argu['vlan_tag'] = 0
-        vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
-        if vlan_tag_map:
-            argu['vlan_tag']  = str(vlan_tag_map['vlan_tag'])
         lb_name = argu['vip_id']  #need verify
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        self.segment_name = lb_name
         # create segment name and user and interface
         self._create_segment(self.base_rest_urls, lb_name, va_name)
         self._create_segment_user(self.base_rest_urls, lb_name, va_name)
         self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name)
-        #self._segment_nat(self.context, self.base_rest_urls, lb_name, argu['vip_address'], va_name)
         # create vip
         if len(self.hostnames) == 1:
             self._create_vip(self.base_rest_urls, argu['ip_address'],
                 argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name)
-            self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
-                    argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
-                    sec_port_id=sec_port_id, cluster_id=vlan_tag_map['vlan_tag'])
             self.write_memory(argu, self.segment_enable)
         else:
+            vlan_tag = 0
+            vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
+            if vlan_tag_map:
+                vlan_tag  = vlan_tag_map['vlan_tag']
             interface_mapping = argu['interface_mapping']
             unit_list = []
             pool_name = "pool_" + argu['vip_id']
@@ -174,7 +172,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
-                    argu['vlan_tag'], argu['gateway'], va_name, lb_name)
+                    str(vlan_tag), argu['gateway'], va_name, lb_name)
                 unit_list.append(unit_item)
             in_interface = self.plugin_rpc.get_interface(self.context)
             if not in_interface:
@@ -182,10 +180,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 return 
             self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
                     argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
-                    sec_port_id=sec_port_id, cluster_id=vlan_tag_map['vlan_tag'])
+                    sec_port_id=sec_port_id, cluster_id=vlan_tag)
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
-                    argu['vip_address'], argu['vlan_tag'], lb_name, pool_name, 
+                    argu['vip_address'], str(vlan_tag), lb_name, pool_name, 
                     argu['pool_address'], va_name, self.context, argu['subnet_id'],
                     in_interface)
             self.write_memory(argu, self.segment_enable)
@@ -225,16 +223,15 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             port_name = argu['vip_id'] + "_port"
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
         # delete vip
-        self._delete_vip(str(argu['vlan_tag']), va_name)
-        self._delete_segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name)
-        # self._delete_segment_nat(self.context, self.base_rest_urls, lb_name, argu['vip_address'], va_name)
-        self._delete_segment_user(self.base_rest_urls, va_name)
+        if not argu['vlan_tag']:
+            LOG.error("Failed to got the vlan tag to delete loadbalancer")
+            return
         self._delete_segment(self.base_rest_urls, lb_name, va_name)
+        self._delete_vip(str(argu['vlan_tag']), va_name)
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name):
         """ create vip"""
 
-        # cmd_apv_config_vlan = None
         in_interface = self.plugin_rpc.get_interface(self.context)
         if not in_interface:
             return
@@ -250,16 +247,15 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.error("Failed to get available internal ip address")
             return
         cmd_apv_config_ip = ADCDevice.configure_segment_ip(interface_name, vip_address, netmask, internal_ip)
-        ip_net = (IPy.IP(vip_address).make_net(netmask)).strNormal(0)
-        #cmd_apv_config_route = ADCDevice.configure_route_apv(ip_net, netmask, gateway)
+        cmd_apv_config_route = ADCDevice.configure_route(gateway)
 
         if isinstance(base_rest_urls, list):
             for base_rest_url in base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name, self.segment_enable)
-                #self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+                self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
         else:
             self.run_cli_extend(base_rest_urls, cmd_apv_config_ip, va_name, self.segment_enable)
-            #self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
+            self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
 
 
     def _delete_vip(self, vlan_tag, va_name):
@@ -272,14 +268,62 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.debug("Cannot get the vlan tag when delete vip")
             return
         LOG.debug("no the vip address into interface")
-        cmd_apv_no_ipv4 = ADCDevice.no_segment_ip(interface_name, 4)
-        cmd_apv_no_ipv6 = ADCDevice.no_segment_ip(interface_name, 6)
 
         for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_apv_no_ipv4, va_name, self.segment_enable)
-            self.run_cli_extend(base_rest_url, cmd_apv_no_ipv6, va_name, self.segment_enable)
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name, self.segment_enable)
+
+
+    def create_member(self, argu):
+        """ create a member"""
+
+        if not argu:
+            LOG.error("In create_member, it should not pass the None.")
+            return
+        va_name = self.get_va_name(argu)
+
+        member_address = argu['member_address']
+        ip_version = IPy.IP(member_address).version()
+        netmask = 32 if ip_version == 4 else 128
+
+        segment_name  = argu['lb_id']
+        internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, member_address)
+        if not internal_ip:
+            LOG.error("Failed to get available internal ip address in func create_member")
+            return
+        cmd_segment_nat = ADCDevice.segment_nat(segment_name, internal_ip, member_address, netmask)
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_segment_nat, va_name, self.segment_enable)
+        cmd_apv_create_real_server = ADCDevice.create_real_server(
+                                                       argu['member_id'],
+                                                       member_address,
+                                                       argu['member_port'],
+                                                       argu['protocol']
+                                                       )
+
+        cmd_apv_add_rs_into_group = ADCDevice.add_rs_into_group(
+                                                               argu['pool_id'],
+                                                               argu['member_id'],
+                                                               argu['member_weight']
+                                                               )
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_apv_create_real_server, va_name)
+            self.run_cli_extend(base_rest_url, cmd_apv_add_rs_into_group, va_name)
+
+
+    def delete_member(self, argu):
+        """ Delete a member"""
+
+        if not argu:
+            LOG.error("In delete_member, it should not pass the None.")
+            return
+
+        va_name = self.get_va_name(argu)
+        cmd_apv_no_rs = ADCDevice.no_real_server(argu['protocol'],
+            argu['member_id'], argu['member_port'])
+
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
 
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
