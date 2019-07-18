@@ -91,6 +91,16 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         recovery_va_status = loopingcall.FixedIntervalLoopingCall(self.recovery_va_configuration)
         recovery_va_status.start(interval=60)
 
+        scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
+        scrub_dead_agents.start(interval=150)
+
+
+    def scrub_dead_agents(self):
+        try:
+            self.plugin_rpc.scrub_dead_agents(context)
+        except Exception as e:
+            LOG.debug("failed to scrub dead agents: %s" % e.message)
+
 
     def update_lb_status(self):
         try:
