@@ -639,6 +639,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ha_ssf_peer(peer_address):
+        cmd = "ha ssf peer %s" % peer_address
+        return cmd
+
+    @staticmethod
     def ha_ssf_on():
         cmd = "ha ssf on"
         return cmd
