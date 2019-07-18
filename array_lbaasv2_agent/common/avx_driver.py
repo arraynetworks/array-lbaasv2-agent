@@ -11,10 +11,12 @@
 # limitations under the License.
 #
 import logging
+import copy
 
 from oslo_config import cfg
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
+from array_lbaasv2_agent.common.adc_device import ADCDevice
 
 LOG = logging.getLogger(__name__)
 
@@ -71,4 +73,70 @@ class ArrayAVXAPIDriver(ArrayCommonAPIDriver):
             return "bond1"
         else:
             return "port1"
+
+    def recovery_va(self, base_rest_url, cur_idx, vapv):
+        unit_list = []
+        LOG.debug("Try to recovery va(%s) in host(%s)" % (vapv['hostname'], self.hostnames[cur_idx]))
+
+        for idx in range(2):
+            unit_item = {}
+            if idx == 0:
+                if cfg.CONF.arraynetworks.bonding:
+                    ip_address = "2.2.2.2"
+                unit_item['priority'] = 100
+                unit_item['name'] = vapv['lb_id'][:6] + '_p'
+            elif idx == 1:
+                if cfg.CONF.arraynetworks.bonding:
+                    ip_address = "2.2.2.3"
+                unit_item['name'] = vapv['lb_id'][:6] + '_s'
+                unit_item['priority'] = 90
+            unit_item['ip_address'] = ip_address
+            unit_list.append(unit_item)
+            if idx == cur_idx:
+                vlan_tag = vapv['cluster_id']
+                self._configure_ip(base_rest_url, vlan_tag, ip_address,
+                    "255.255.255.0", vapv['hostname'])
+        try:
+            LOG.debug("unit_list: --%s--" % unit_list)
+            self.configure_basic_ha(base_rest_url, unit_list, cur_idx, vapv['hostname'])
+            self.plugin_rpc.update_excepted_vapv_by_name(self.context, vapv['hostname'])
+            cmd_apv_write_memory = ADCDevice.write_memory()
+            self.run_cli_extend(base_rest_url, cmd_apv_write_memory, vapv['hostname'])
+        except Exception as e:
+            LOG.debug("Still failed to recovery the va(%s): %s" % (vapv['hostname'], e.message))
+
+    def recovery_lbs_configuration(self):
+        if len(self.hostnames) == 1:
+            LOG.debug("Don't need to recovery the vas.")
+            return
+
+        vapvs = self.plugin_rpc.get_excepted_vapvs(self.context)
+        if not vapvs:
+            LOG.debug("No any VAs need to be recoveried")
+            return
+        for vapv in vapvs:
+            idx = vapv['in_use_lb'] - 10
+            hostname = self.hostnames[idx]
+            base_rest_url = "https://" + hostname + ":9997/rest/avx"
+            connected = self.get_restful_status(base_rest_url)
+            if not connected:
+                LOG.debug("Failed to connect the AVX(%s)..." % hostname)
+                return
+            self.recovery_va(base_rest_url, idx, vapv)
+
+    def update_member_status(self, agent_host_name):
+        lb_members = self.plugin_rpc.get_members_status_on_agent(self.context,
+            agent_host_name)
+        lb_members_ori = copy.deepcopy(lb_members)
+        LOG.debug("lb_members_ori: ----%s----" % lb_members_ori)
+        lb_members = self.driver.get_status_by_lb_mems(lb_members)
+        LOG.debug("lb_members: ----%s----" % lb_members)
+        for lb_id, lb_members_status in lb_members_ori.items():
+            for member_id, member_status in lb_members_status.items():
+                new_member_status = lb_members[lb_id][member_id]
+                LOG.debug("new_member_status(%s)---member_status(%s)" % (new_member_status, member_status))
+                if new_member_status != member_status:
+                    LOG.debug("--------will update_member_status -------")
+                    self.plugin_rpc.update_member_status(self.context,
+                        member_id, new_member_status)
 

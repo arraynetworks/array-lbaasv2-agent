@@ -88,8 +88,8 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         heartbeat_lb_status = loopingcall.FixedIntervalLoopingCall(self.update_lb_status)
         heartbeat_lb_status.start(interval=45)
 
-        recovery_va_status = loopingcall.FixedIntervalLoopingCall(self.recovery_va_configuration)
-        recovery_va_status.start(interval=60)
+        recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
+        recovery_lb_status.start(interval=60)
 
         scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
         scrub_dead_agents.start(interval=150)
@@ -104,7 +104,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
 
     def update_lb_status(self):
         try:
-            self.driver.update_member_status(self.agent_host)
+            self.driver.driver.update_member_status(self.agent_host)
         except Exception as e:
             LOG.debug("failed to update member status: %s" % e.message)
 
@@ -112,12 +112,12 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         LOG.info("entering _report_state");
         self.report_state_rpc.report_state(self.context, self.agent_state)
 
-    def recovery_va_configuration(self):
+    def recovery_lbs_configuration(self):
         LOG.info("Recovery va configuration...");
         try:
-            self.driver.driver.recovery_vas_configuration()
+            self.driver.driver.recovery_lbs_configuration()
         except Exception as e:
-            LOG.debug("failed to recovery va configuration: %s" % e.message)
+            LOG.debug("failed to recovery LBs configuration: %s" % e.message)
 
     @log_helpers.log_method_call
     def create_loadbalancer_and_allocate_vip(self, context, obj):
