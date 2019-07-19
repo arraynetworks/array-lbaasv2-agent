@@ -202,6 +202,12 @@ class ArrayPluginApi(object):
         return cctxt.call(context, 'update_member_status',
             member_id=member_id, operating_status=operating_status)
 
+    def check_subnet_used(self, context, subnet_id,
+        lb_id_filter=None, member_id_filter=None):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'check_subnet_used', subnet_id=subnet_id,
+            lb_id_filter=lb_id_filter, member_id_filter=member_id_filter)
+
     def get_members_status_on_agent(self, context, agent_host_name):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_members_status_on_agent',

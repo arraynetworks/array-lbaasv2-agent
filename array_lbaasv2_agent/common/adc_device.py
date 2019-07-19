@@ -633,6 +633,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_interface(port_name):
+        cmd = "show interface %s" % port_name
+        return cmd
+
+    @staticmethod
     def synconfig_from_peer(peer_name):
         cmd = "synconfig from %s" % peer_name
         return cmd

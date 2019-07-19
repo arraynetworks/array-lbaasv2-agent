@@ -11,6 +11,7 @@
 # limitations under the License.
 #
 import logging
+import netaddr
 
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 from array_lbaasv2_agent.common.adc_device import ADCDevice
@@ -36,16 +37,68 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         return None
 
 
-    def get_va_interface(self):
-        pass
-
-
-
     def init_array_device(self):
         if len(self.hostnames) > 1:
             for idx, hostname in enumerate(self.hostnames):
                 LOG.debug("Will init the device whose ip is %s", hostname)
                 self.init_one_array_device(idx)
+
+    def check_vlan_existed_in_device(self, vlan_tag):
+        device_name = "vlan." + str(vlan_tag)
+        base_rest_url = self.base_rest_urls[0]
+        cmd_show_interface = ADCDevice.show_interface()
+        r = self.run_cli_extend(base_rest_url, cmd_show_interface)
+        if device_name in r.text:
+            return True
+        return False
+
+    def create_port_for_subnet(self, subnet_id, vlan_tag, lb_id):
+        if not subnet_id or not vlan_tag or not lb_id:
+            LOG.debug("The argument for create_port_for_subnet isn't right.")
+            return False
+        if self.check_vlan_existed_in_device(vlan_tag):
+            LOG.debug("The port has been created in device, ignore to create port")
+            return True
+
+        vlan_tag = str(vlan_tag)
+        device_name = "vlan." + vlan_tag
+        hostname = self.conf.arraynetworks.agent_host
+        port_name = subnet_id + "_port"
+        interface_name = self.plugin_rpc.get_interface(self.context)
+
+        subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
+        member_network = netaddr.IPNetwork(subnet['cidr'])
+        subnet_port = self.plugin_rpc.create_port_on_subnet(self.context,
+            subnet_id, port_name, hostname, lb_id)
+
+        ip_address = subnet_port['fixed_ips'][0]['ip_address']
+        netmask = str(member_network.netmask)
+        if member_network.version == 6:
+            idx = subnet['cidr'].find('/')
+            netmask = subnet['cidr'][idx+1:]
+
+        cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
+        cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_vlan_device)
+            self.run_cli_extend(base_rest_url, cmd_configure_ip)
+
+
+    def delete_port_for_subnet(self, subnet_id, vlan_tag):
+        if not subnet_id or not vlan_tag:
+            LOG.error("The argument for delete_port_for_subnet isn't right.")
+            return False
+        if not self.check_vlan_existed_in_device(vlan_tag):
+            LOG.debug("The port wasn't created in device, ignore to delete port")
+            return True
+
+        port_name = subnet_id + "_port"
+        device_name = "vlan." + vlan_tag
+        cmd_no_vlan_device = ADCDevice.no_vlan_device(device_name)
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_no_vlan_device)
+        self.plugin_rpc.delete_port_by_name(self.context, port_name)
+
 
     def init_one_array_device(self, cur_idx):
         base_rest_url = self.base_rest_urls[cur_idx]
