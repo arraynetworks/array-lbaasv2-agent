@@ -75,7 +75,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         }
 
         if callable(getattr(self.driver.driver, 'init_array_device', None)):
-            self.driver.driver.init_array_device(self)
+            self.driver.driver.init_array_device()
 
 
     def _setup_plugin_rpc(self):
