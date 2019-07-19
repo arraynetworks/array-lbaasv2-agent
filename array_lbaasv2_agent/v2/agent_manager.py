@@ -74,6 +74,9 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             'start_flag': True,
         }
 
+        if callable(getattr(self.driver.driver, 'init_array_device', None)):
+            self.driver.driver.init_array_device(self)
+
 
     def _setup_plugin_rpc(self):
         topic = constants_v2.TOPIC_PROCESS_ON_HOST_V2
@@ -113,7 +116,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         self.report_state_rpc.report_state(self.context, self.agent_state)
 
     def recovery_lbs_configuration(self):
-        LOG.info("Recovery va configuration...");
+        LOG.info("Recovery LB configuration...");
         try:
             self.driver.driver.recovery_lbs_configuration()
         except Exception as e:
