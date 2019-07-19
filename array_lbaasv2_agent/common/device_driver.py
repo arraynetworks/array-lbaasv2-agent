@@ -16,7 +16,6 @@ import netaddr
 from oslo_config import cfg
 from oslo_utils import importutils
 import logging
-import copy
 import six
 import time
 

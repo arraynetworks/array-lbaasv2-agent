@@ -21,6 +21,7 @@ from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 from array_lbaasv2_agent.common.adc_device import ADCDevice
 from array_lbaasv2_agent.common.adc_device import is_driver_apv
 from array_lbaasv2_agent.common import exceptions as driver_except
+from neutron_lbaas.services.loadbalancer import constants as lb_const
 
 LOG = logging.getLogger(__name__)
 
