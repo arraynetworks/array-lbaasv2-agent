@@ -67,6 +67,11 @@ OPTS = [
         'array_device_driver',
         default=('array_lbaasv2_agent.common.avx_driver.ArrayAVXAPIDriver'),
         help=('The driver used to provision ADC product')
+    ),
+    cfg.BoolOpt(
+        'net_seg_enable',
+        default=False,
+        help=('Enable network segment function')
     )
 ]
 
@@ -320,6 +325,7 @@ class ArrayADCDriver(object):
             argu['pool_id'] = None
 
         self.driver.delete_listener(argu)
+        self.driver.write_memory(argu)
 
 
     def create_pool(self, obj):
@@ -404,6 +410,7 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.delete_pool(argu)
+        self.driver.write_memory(argu)
 
     def create_member(self, obj):
         member = obj
@@ -443,6 +450,7 @@ class ArrayADCDriver(object):
         argu['vip_id'] = member['pool']['loadbalancer_id']
 
         self.driver.delete_member(argu)
+        self.driver.write_memory(argu)
 
     def create_health_monitor(self, obj):
         hm = obj
@@ -481,6 +489,7 @@ class ArrayADCDriver(object):
         argu['pool_id'] = hm['pool']['id']
         argu['vip_id'] = hm['pool']['loadbalancer_id']
         self.driver.delete_health_monitor(argu)
+        self.driver.write_memory(argu)
 
     def create_l7rule(self, rule):
         argu = {}
@@ -700,20 +709,3 @@ class ArrayADCDriver(object):
                 self.driver.create_l7_rule(argu, action_created=created)
         else:
             LOG.debug("It doesn't support to create more than three rule in one policy.")
-
-    def update_member_status(self, agent_host_name):
-        lb_members = self.plugin_rpc.get_members_status_on_agent(self.context,
-            agent_host_name)
-        lb_members_ori = copy.deepcopy(lb_members)
-        LOG.debug("lb_members_ori: ----%s----" % lb_members_ori)
-        lb_members = self.driver.get_status_by_lb_mems(lb_members)
-        LOG.debug("lb_members: ----%s----" % lb_members)
-        for lb_id, lb_members_status in lb_members_ori.items():
-            for member_id, member_status in lb_members_status.items():
-                new_member_status = lb_members[lb_id][member_id]
-                LOG.debug("new_member_status(%s)---member_status(%s)" % (new_member_status, member_status))
-                if new_member_status != member_status:
-                    LOG.debug("--------will update_member_status -------")
-                    self.plugin_rpc.update_member_status(self.context,
-                        member_id, new_member_status)
-

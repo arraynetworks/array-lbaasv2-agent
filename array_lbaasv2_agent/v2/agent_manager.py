@@ -74,6 +74,9 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             'start_flag': True,
         }
 
+        if callable(getattr(self.driver.driver, 'init_array_device', None)):
+            self.driver.driver.init_array_device()
+
 
     def _setup_plugin_rpc(self):
         topic = constants_v2.TOPIC_PROCESS_ON_HOST_V2
@@ -91,7 +94,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
 
     def update_lb_status(self):
         try:
-            self.driver.update_member_status(self.agent_host)
+            self.driver.driver.update_member_status(self.agent_host)
         except Exception as e:
             LOG.debug("failed to update member status: %s" % e.message)
 

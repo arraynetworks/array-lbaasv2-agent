@@ -215,4 +215,8 @@ class ArrayPluginApi(object):
 
     def delete_vlan_by_port(self, context, port_id):
         cctxt = self.client.prepare()
-        return cctxt.call(context, 'delete_vlan_by_port', port_id=port_id)        
+        return cctxt.call(context, 'delete_vlan_by_port', port_id=port_id)
+
+    def get_interface_port(self, context, bond):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_interface_port', bond=bond)

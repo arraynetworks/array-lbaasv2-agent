@@ -48,6 +48,12 @@ class ADCDevice(object):
     """
 
     @staticmethod
+    def segment_enable():
+        cmd = "segment enable"
+        return cmd
+
+
+    @staticmethod
     def create_segment(segment_name):
         cmd = "segment name %s" % (segment_name)
         return cmd
@@ -692,6 +698,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def monitor_vcondition_name_apv(group_id):
+        cmd = "monitor vcondition name v%d VCONDITION_1 AND" % (group_id)
+        return cmd
+
+    @staticmethod
     def monitor_vcondition_member():
         cmd = []
         cmd.append("monitor vcondition member rule1 PORT_1")
@@ -699,8 +710,21 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def monitor_vcondition_member_apv(group_id, port_list):
+        cmds = []
+        for port in port_list:
+            cmd = "monitor vcondition member v%d %s" % (group_id, port)
+            cmds.append(cmd)
+        return cmds
+
+    @staticmethod
     def ha_decision_rule():
         cmd = "ha decision rule rule1 Group_Failover 1"
+        return cmd
+
+    @staticmethod
+    def ha_decision_rule_apv(group_id):
+        cmd = "ha decision rule v%d Group_Failover %d", (group_id, group_id)
         return cmd
 
     @staticmethod
