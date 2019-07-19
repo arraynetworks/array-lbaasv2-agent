@@ -74,7 +74,7 @@ class ADCDevice(object):
 
     @staticmethod
     def segment_nat(segment_name, internal_ip, segment_ip, netmask):
-        cmd = "segment nat %s %s %s %s" % (segment_name, internal_ip, segment_ip, netmask)
+        cmd = "segment nat %s %s %s %s" % (segment_name, segment_ip, internal_ip, netmask)
         return cmd
 
     @staticmethod

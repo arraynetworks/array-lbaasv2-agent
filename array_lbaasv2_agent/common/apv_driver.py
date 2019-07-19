@@ -96,11 +96,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self.run_cli_extend(base_rest_urls, cmd_delete_segment_user, va_name, self.segment_enable)
 
 
-    def _segment_interface(self, base_rest_urls, vlan_tag, segment_name, va_name):
+    def _segment_interface(self, base_rest_urls, vlan_tag, segment_name, va_name, in_interface):
         cmd_apv_config_vlan = None
-        in_interface = self.plugin_rpc.get_interface(self.context)
-        if not in_interface:
-            return
         interface_name = in_interface
 
         if vlan_tag:
@@ -140,20 +137,25 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         lb_name = argu['vip_id']  #need verify
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
         self.segment_name = lb_name
+        interface = self.plugin_rpc.get_interface(self.context)
+        if not interface:
+            LOG.error("Failed to get the interface from driver get_interface")
+            return
         # create segment name and user and interface
         self._create_segment(self.base_rest_urls, lb_name, va_name)
         self._create_segment_user(self.base_rest_urls, lb_name, va_name)
-        self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name)
         # create vip
         if len(self.hostnames) == 1:
+            self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             self._create_vip(self.base_rest_urls, argu['ip_address'],
-                argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name)
+                argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
             self.write_memory(argu, self.segment_enable)
         else:
             vlan_tag = 0
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
             if vlan_tag_map:
                 vlan_tag  = vlan_tag_map['vlan_tag']
+            self._segment_interface(self.base_rest_urls, str(vlan_tag), lb_name, va_name, interface)
             interface_mapping = argu['interface_mapping']
             unit_list = []
             pool_name = "pool_" + argu['vip_id']
@@ -172,12 +174,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
-                    str(vlan_tag), argu['gateway'], va_name, lb_name)
+                    str(vlan_tag), argu['gateway'], va_name, lb_name, interface)
                 unit_list.append(unit_item)
-            in_interface = self.plugin_rpc.get_interface(self.context)
-            if not in_interface:
-                LOG.error("Failed to get the interface from plugin_rpc")
-                return 
+
             self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
                     argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
                     sec_port_id=sec_port_id, cluster_id=vlan_tag)
@@ -185,7 +184,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 self.configure_ha(base_rest_url, unit_list,
                     argu['vip_address'], str(vlan_tag), lb_name, pool_name, 
                     argu['pool_address'], va_name, self.context, argu['subnet_id'],
-                    in_interface)
+                    interface)
             self.write_memory(argu, self.segment_enable)
 
 
@@ -229,12 +228,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self._delete_segment(self.base_rest_urls, lb_name, va_name)
         self._delete_vip(str(argu['vlan_tag']), va_name)
 
-    def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name):
+    def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface):
         """ create vip"""
 
-        in_interface = self.plugin_rpc.get_interface(self.context)
-        if not in_interface:
-            return
         interface_name = in_interface
 
         LOG.debug("Configure the vip address into interface")
@@ -287,7 +283,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         netmask = 32 if ip_version == 4 else 128
 
         segment_name  = argu['lb_id']
-        internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, member_address)
+        internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, member_address, use_for_nat=True)
         if not internal_ip:
             LOG.error("Failed to get available internal ip address in func create_member")
             return
