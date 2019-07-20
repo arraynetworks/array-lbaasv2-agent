@@ -53,6 +53,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         return False
 
     def create_port_for_subnet(self, subnet_id, vlan_tag, lb_id):
+        '''
+        The function should be invoked when create loadbalance and member.
+        '''
         if not subnet_id or not vlan_tag or not lb_id:
             LOG.debug("The argument for create_port_for_subnet isn't right.")
             return False
@@ -84,12 +87,29 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self.run_cli_extend(base_rest_url, cmd_configure_ip)
 
 
-    def delete_port_for_subnet(self, subnet_id, vlan_tag):
+    def delete_port_for_subnet(self, subnet_id, vlan_tag,
+        lb_id_filter=None, member_id_filter=None):
+        '''
+        The function should be invoked when delete loadbalance and delete member.
+        When delete delete loadbalance, the lb_id_filter should be filled and should be
+        the id of the loadbalancer which will be deleted.
+        When delete delete member, the member_id_filter should be filled and should be
+        the id of the member which will be deleted.
+        '''
         if not subnet_id or not vlan_tag:
             LOG.error("The argument for delete_port_for_subnet isn't right.")
             return False
         if not self.check_vlan_existed_in_device(vlan_tag):
             LOG.debug("The port wasn't created in device, ignore to delete port")
+            return True
+
+        res_count = self.plugin_rpc.check_subnet_used(self.context,
+            subnet_id, lb_id_filter, member_id_filter)
+        if not res_count:
+            LOG.debug("Failed to get the res count.")
+            return False
+        if res_count['count'] >= 1:
+            LOG.debug("The port is still used by other resource, ignore to delete it")
             return True
 
         port_name = subnet_id + "_port"
