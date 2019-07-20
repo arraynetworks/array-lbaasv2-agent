@@ -605,7 +605,7 @@ class ArrayCommonAPIDriver(object):
 
 
     def run_cli_extend(self, base_rest_url, cmd, va_name=None,
-        connect_timeout=5, read_timeout=5):
+        connect_timeout=5, read_timeout=5, run_timeout=60):
         exception = None
         if not cmd:
             return
@@ -613,7 +613,8 @@ class ArrayCommonAPIDriver(object):
         if va_name:
             cmd = "va run %s \"%s\"" % (va_name, cmd)
         payload = {
-            "cmd": cmd
+            "cmd": cmd,
+            "timeout": run_timeout
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)

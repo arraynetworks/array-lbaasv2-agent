@@ -747,3 +747,18 @@ class ADCDevice(object):
         cmd = "show ha status"
         return cmd
 
+    @staticmethod
+    def show_ha_config():
+        cmd = "show ha config"
+        return cmd
+
+    @staticmethod
+    def show_interface(port_name):
+        cmd = "show interface %s" % port_name
+        return cmd
+
+    @staticmethod
+    def synconfig_from_peer(peer_name):
+        cmd = "synconfig from %s" % peer_name
+        return cmd
+

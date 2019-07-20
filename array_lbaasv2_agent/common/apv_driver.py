@@ -134,7 +134,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def _delete_segment_interface(self, base_rest_urls, vlan_tag, segment_name, va_name):
         if not vlan_tag:
             LOG.error("Lack of configuration vlan_tag")
-            return            
+            return
         interface_name = "vlan." + vlan_tag
         cmd_delete_segment_interface = ADCDevice.delete_segment_interface(segment_name, interface_name)
         if isinstance(base_rest_urls, list):
@@ -373,7 +373,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for unit_item in unit_list:
             unit_name = unit_item['name']
             ip_address = unit_item['ip_address']
-            peer_ip_address = ip_address
             priority = unit_item['priority']
             cmd_ha_group_priority = ADCDevice.ha_group_priority(unit_name, group_id, priority)
             self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name, self.segment_enable)
@@ -417,7 +416,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
 
     def run_cli_extend(self, base_rest_url, cmd, va_name=None, segment_enable=False,
-        connect_timeout=60, read_timeout=60, auth_val=None):
+        connect_timeout=60, read_timeout=60, auth_val=None, run_timeout=60):
         exception = None
         if not cmd:
             return
@@ -425,7 +424,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         if va_name and is_driver_apv():
             cmd = "va run %s \"%s\"" % (va_name, cmd)
         payload = {
-            "cmd": cmd
+            "cmd": cmd,
+            "timeout": run_timeout
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
@@ -516,9 +516,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_link_ffo_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_segment_enable, segment_enable=self.segment_enable)
-
-    def recovery_lbs_configuration(self):
-        pass
+        time.sleep(10)
 
     def get_all_health_status(self, va_name, lb_id):
         status_dic = {}
@@ -578,3 +576,22 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         except Exception:
             return False
         return True
+
+    def recovery_lbs_configuration(self):
+        if len(self.hostnames) <= 1:
+            LOG.debug("It can't build the HA environment.")
+            return True
+        LOG.debug("It will check the status of HA")
+        cmd_show_ha_config = ADCDevice.show_ha_config()
+        for idx, base_rest_url in enumerate(self.base_rest_urls):
+            r = self.run_cli_extend(base_rest_url, cmd_show_ha_config,
+                segment_enable=self.segment_enable)
+            if "ha off" in r.text:
+                LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
+                self.init_one_array_device(idx)
+                peer_name = "unit_s"
+                if idx == 1:
+                    peer_name = "unit_m"
+                cmd_synconfig_from_peer = ADCDevice.synconfig_from_peer(peer_name)
+                self.run_cli_extend(base_rest_url, cmd_synconfig_from_peer,
+                    run_timeout=600, segment_enable=self.segment_enable)
