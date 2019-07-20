@@ -190,14 +190,21 @@ class ArrayPluginApi(object):
         return cctxt.call(context, 'update_member_status',
             member_id=member_id, operating_status=operating_status)
 
+    def check_subnet_used(self, context, subnet_id,
+        lb_id_filter=None, member_id_filter=None):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'check_subnet_used', subnet_id=subnet_id,
+            lb_id_filter=lb_id_filter, member_id_filter=member_id_filter)
+
+
     def get_members_status_on_agent(self, context, agent_host_name):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_members_status_on_agent',
             agent_host_name=agent_host_name)
-    def get_clusterids_by_subnet(self, context, subnet_id):
+    def get_clusterids_by_lb(self, context, lb_id):
         cctxt = self.client.prepare()
-        return cctxt.call(context, 'get_cluster_id_by_subnet_id',
-            subnet_id=subnet_id)
+        return cctxt.call(context, 'get_cluster_id_by_lb_id',
+            lb_id=lb_id)
 
     def get_available_internal_ip(self, context, segment_name, segment_ip, use_for_nat=False):
         cctxt = self.client.prepare()

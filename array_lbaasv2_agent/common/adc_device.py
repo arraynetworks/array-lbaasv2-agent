@@ -713,7 +713,9 @@ class ADCDevice(object):
     def monitor_vcondition_member_apv(group_id, port_list):
         cmds = []
         for port in port_list:
-            cmd = "monitor vcondition member v%d %s" % (group_id, port)
+            port_idx = port[4:]
+            port_name = "PORT_" + port_idx
+            cmd = "monitor vcondition member v%d %s" % (group_id, port_name)
             cmds.append(cmd)
         return cmds
 
@@ -724,7 +726,7 @@ class ADCDevice(object):
 
     @staticmethod
     def ha_decision_rule_apv(group_id):
-        cmd = "ha decision rule v%d Group_Failover %d", (group_id, group_id)
+        cmd = "ha decision rule v%d Group_Failover %d" % (group_id, group_id)
         return cmd
 
     @staticmethod
@@ -746,6 +748,8 @@ class ADCDevice(object):
     def show_ha_status():
         cmd = "show ha status"
         return cmd
+
+    @staticmethod
 
     @staticmethod
     def show_ha_config():
