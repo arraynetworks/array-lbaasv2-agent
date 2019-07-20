@@ -750,8 +750,6 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
-
-    @staticmethod
     def show_ha_config():
         cmd = "show ha config"
         return cmd
