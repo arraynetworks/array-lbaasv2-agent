@@ -633,6 +633,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_ha_config():
+        cmd = "show ha config"
+        return cmd
+
+    @staticmethod
     def show_interface(port_name):
         cmd = "show interface %s" % port_name
         return cmd

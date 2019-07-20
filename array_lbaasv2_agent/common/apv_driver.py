@@ -143,6 +143,18 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_on)
 
     def recovery_lbs_configuration(self):
-        pass
-
-
+        if len(self.hostnames) <= 1:
+            LOG.debug("It can't build the HA environment.")
+            return True
+        cmd_show_ha_config = ADCDevice.show_ha_config()
+        for idx, base_rest_url in enumerate(self.base_rest_urls):
+            r = self.run_cli_extend(base_rest_url, cmd_show_ha_config)
+            if "ha off" in r.text:
+                LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
+                self.init_one_array_device(idx)
+                peer_name = "unit_s"
+                if idx == 1:
+                    peer_name = "unit_m"
+                cmd_synconfig_from_peer = ADCDevice.synconfig_from_peer(peer_name)
+                self.run_cli_extend(base_rest_url, cmd_synconfig_from_peer,
+                    run_timeout=600)
