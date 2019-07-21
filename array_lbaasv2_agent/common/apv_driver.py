@@ -512,7 +512,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         device_name = "vlan." + str(vlan_tag)
         base_rest_url = self.base_rest_urls[0]
         cmd_show_interface = ADCDevice.show_interface(device_name)
-        r = self.run_cli_extend(base_rest_url, cmd_show_interface)
+        r = self.run_cli_extend(base_rest_url, cmd_show_interface,
+            segment_enable=self.segment_enable)
         if device_name in r.text:
             return True
         return False
@@ -530,7 +531,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         vlan_tag = str(vlan_tag)
         device_name = "vlan." + vlan_tag
-        hostname = self.conf.arraynetworks.agent_host
+        hostname = cfg.CONF.arraynetworks.agent_host
         port_name = subnet_id + "_port"
         interface_name = self.plugin_rpc.get_interface(self.context)
 
@@ -548,8 +549,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
         cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
         for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_vlan_device)
-            self.run_cli_extend(base_rest_url, cmd_configure_ip)
+            self.run_cli_extend(base_rest_url, cmd_vlan_device,
+                segment_enable=self.segment_enable)
+            self.run_cli_extend(base_rest_url, cmd_configure_ip,
+                segment_enable=self.segment_enable)
 
 
     def delete_port_for_subnet(self, subnet_id, vlan_tag,
@@ -581,7 +584,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         device_name = "vlan." + vlan_tag
         cmd_no_vlan_device = ADCDevice.no_vlan_device(device_name)
         for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_no_vlan_device)
+            self.run_cli_extend(base_rest_url, cmd_no_vlan_device,
+                segment_enable=self.segment_enable)
         self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
 
@@ -696,7 +700,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_show_ip_addr = ADCDevice.show_ip_addr()
         try:
             self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
-                segment_enable=self.segment_enable)
+            	segment_enable=self.segment_enable)
         except Exception:
             return False
         return True
@@ -787,41 +791,41 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def create_listener(self, argu):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).create_listener(self, argu)
+        super(ArrayAPVAPIDriver, self).create_listener(argu)
 
     def delete_listener(self, argu):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).delete_listener(self, argu)
+        super(ArrayAPVAPIDriver, self).delete_listener(argu)
 
     def create_pool(self, argu):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).create_pool(self, argu)
+        super(ArrayAPVAPIDriver, self).create_pool(argu)
 
     def delete_pool(self, argu):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).delete_pool(self, argu)
+        super(ArrayAPVAPIDriver, self).delete_pool(argu)
 
     def create_health_monitor(self, argu):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).create_health_monitor(self, argu)
+        super(ArrayAPVAPIDriver, self).create_health_monitor(argu)
 
     def delete_health_monitor(self, argu):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).delete_health_monitor(self, argu)
+        super(ArrayAPVAPIDriver, self).delete_health_monitor(argu)
 
     def create_l7_policy(self, argu, updated=False):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).create_l7_policy(self, argu, updated)
+        super(ArrayAPVAPIDriver, self).create_l7_policy(argu, updated)
 
     def delete_l7_policy(self, argu, updated=False):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).delete_l7_policy(self, argu, updated)
+        super(ArrayAPVAPIDriver, self).delete_l7_policy(argu, updated)
 
     def create_l7_rule(self, argu, action_created=False):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).create_l7_rule(self, argu, action_created)
+        super(ArrayAPVAPIDriver, self).create_l7_rule(argu, action_created)
 
     def delete_l7_rule(self, argu, action_deleted=False):
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
-        super(ArrayAPVAPIDriver, self).delete_l7_rule(self, argu, action_deleted)
+        super(ArrayAPVAPIDriver, self).delete_l7_rule(argu, action_deleted)
 
