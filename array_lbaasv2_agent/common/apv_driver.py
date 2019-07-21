@@ -182,10 +182,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         else:
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
             if vlan_tag_map:
-                vlan_tag  = vlan_tag_map['vlan_tag']
+                vlan_tag = vlan_tag_map['vlan_tag']
             if self.net_seg_enable:
-                self._create_vlan_device(self.base_rest_urls, str(vlan_tag), va_name, interface)
-                self._segment_interface(self.base_rest_urls, str(vlan_tag), lb_name, va_name, interface)
+                self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
+                self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             interface_mapping = argu['interface_mapping']
             unit_list = []
             pool_name = "pool_" + argu['vip_id']
@@ -482,11 +482,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def find_available_cluster_id(self, context, lb_name):
         cluster_ids = self.plugin_rpc.get_clusterids_by_lb(context, lb_name)
         LOG.debug("get the cluster ids (%s)", cluster_ids)
-        supported_ids = range(1, 256)
-        diff_ids=list(set(supported_ids).difference(set(cluster_ids)))
-        if len(diff_ids) > 1:
-            return diff_ids[0]
-        return 0
+        return cluster_ids[0]
 
 
     def write_memory(self, argu=None, segment_enable=False):
