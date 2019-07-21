@@ -225,6 +225,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         va_name = self.get_va_name(argu)
         lb_name = argu['vip_id']  #need verify
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
         # clear the HA configuration
         if len(self.hostnames) > 1:
             unit_list = []
@@ -320,6 +321,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return
         va_name = self.get_va_name(argu)
 
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
         member_address = argu['member_address']
         ip_version = IPy.IP(member_address).version()
         netmask = 32 if ip_version == 4 else 128
@@ -362,6 +364,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.error("In delete_member, it should not pass the None.")
             return
 
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
         va_name = self.get_va_name(argu)
         cmd_apv_no_rs = ADCDevice.no_real_server(argu['protocol'],
             argu['member_id'], argu['member_port'])
@@ -781,3 +784,44 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     LOG.debug("--------will update_member_status -------")
                     self.plugin_rpc.update_member_status(self.context,
                         member_id, new_member_status)
+
+    def create_listener(self, argu):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).create_listener(self, argu)
+
+    def delete_listener(self, argu):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).delete_listener(self, argu)
+
+    def create_pool(self, argu):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).create_pool(self, argu)
+
+    def delete_pool(self, argu):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).delete_pool(self, argu)
+
+    def create_health_monitor(self, argu):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).create_health_monitor(self, argu)
+
+    def delete_health_monitor(self, argu):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).delete_health_monitor(self, argu)
+
+    def create_l7_policy(self, argu, updated=False):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).create_l7_policy(self, argu, updated)
+
+    def delete_l7_policy(self, argu, updated=False):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).delete_l7_policy(self, argu, updated)
+
+    def create_l7_rule(self, argu, action_created=False):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).create_l7_rule(self, argu, action_created)
+
+    def delete_l7_rule(self, argu, action_deleted=False):
+        self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
+        super(ArrayAPVAPIDriver, self).delete_l7_rule(self, argu, action_deleted)
+

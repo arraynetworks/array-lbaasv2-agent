@@ -94,9 +94,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
         recovery_lb_status.start(interval=60)
 
-        scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
-        scrub_dead_agents.start(interval=150)
-
 
     def scrub_dead_agents(self):
         try:
