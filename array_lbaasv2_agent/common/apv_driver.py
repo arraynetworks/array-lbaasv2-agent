@@ -16,6 +16,7 @@ import six
 import time
 import requests
 import IPy
+import copy
 import netaddr
 from oslo_config import cfg
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
@@ -165,6 +166,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self._create_segment(self.base_rest_urls, lb_name, va_name)
         self._create_segment_user(self.base_rest_urls, lb_name, va_name)
         # create vip
+        vlan_tag = 0
         if len(self.hostnames) == 1:
             self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
             if cfg.CONF.arraynetworks.net_seg_enable:
@@ -173,13 +175,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
             self.write_memory(argu, self.segment_enable)
         else:
-            vlan_tag = 0
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
             if vlan_tag_map:
                 vlan_tag  = vlan_tag_map['vlan_tag']
-            self._create_vlan_device(self.base_rest_urls, str(vlan_tag), va_name, interface)
+            self._create_vlan_device(self.base_rest_urls, arug['vlan_tag'], va_name, interface)
             if cfg.CONF.arraynetworks.net_seg_enable:
-                self._segment_interface(self.base_rest_urls, str(vlan_tag), lb_name, va_name, interface)
+                self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             interface_mapping = argu['interface_mapping']
             unit_list = []
             pool_name = "pool_" + argu['vip_id']
@@ -198,18 +199,18 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
-                    str(vlan_tag), argu['gateway'], va_name, lb_name, interface)
+                    arug['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
                 unit_list.append(unit_item)
 
-            self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
-                    argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
-                    sec_port_id=sec_port_id, cluster_id=vlan_tag)
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
-                    argu['vip_address'], str(vlan_tag), lb_name, pool_name, 
+                    argu['vip_address'], argu['vlan_tag'], lb_name, pool_name, 
                     argu['pool_address'], va_name, self.context, argu['subnet_id'],
                     interface)
             self.write_memory(argu, self.segment_enable)
+        self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
+                    argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
+                    sec_port_id=sec_port_id, cluster_id=vlan_tag)
 
 
     def delete_loadbalancer(self, argu):
@@ -240,8 +241,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             port_name = 'lb' + '-'+ argu['vip_id'] + "_1"
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
-            # Delete the apv from database
-            self.plugin_rpc.delete_vapv(self.context, lb_name[:10])
         else:
             port_name = argu['vip_id'] + "_port"
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
@@ -252,6 +251,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self._delete_segment(self.base_rest_urls, lb_name, va_name)
         self._delete_segment_user(self.base_rest_urls, va_name)
         self._delete_vip(str(argu['vlan_tag']), va_name)
+        # Delete the apv from database
+        self.plugin_rpc.delete_vapv(self.context, lb_name[:10])
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface):
         """ create vip"""
@@ -683,7 +684,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             agent_host_name)
         lb_members_ori = copy.deepcopy(lb_members)
         LOG.debug("lb_members_ori: ----%s----" % lb_members_ori)
-        lb_members = self.driver.get_status_by_lb_mems(lb_members)
+        lb_members = self.get_status_by_lb_mems(lb_members)
         LOG.debug("lb_members: ----%s----" % lb_members)
         for lb_id, lb_members_status in lb_members_ori.items():
             for member_id, member_status in lb_members_status.items():
