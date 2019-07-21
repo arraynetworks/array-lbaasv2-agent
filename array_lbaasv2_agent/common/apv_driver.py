@@ -27,6 +27,7 @@ from neutron_lbaas.services.loadbalancer import constants as lb_const
 
 LOG = logging.getLogger(__name__)
 
+off_hosts = []
 
 class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     """ The real implementation on host to push config to
@@ -373,7 +374,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         for unit_item in unit_list:
             unit_name = unit_item['name']
-            ip_address = unit_item['ip_address']
             priority = unit_item['priority']
             cmd_ha_group_priority = ADCDevice.ha_group_priority(unit_name, group_id, priority)
             self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name, self.segment_enable)
@@ -482,11 +482,17 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_write_memory, va_name, segment_enable)
 
+
     def init_array_device(self):
         if len(self.hostnames) > 1:
             for idx, hostname in enumerate(self.hostnames):
-                LOG.debug("Will init the device whose ip is %s", hostname)
-                self.init_one_array_device(idx)
+                ha_status = self.get_ha_status(idx)
+                if not ha_status:
+                    LOG.debug("The HA is off in the device(%s)" % hostname)
+                    self.init_one_array_device(idx)
+                else:
+                    LOG.debug("The HA is on in the device(%s), ignore to \
+                        init the device" % hostname)
 
 
     def check_vlan_existed_in_device(self, vlan_tag):
@@ -588,6 +594,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_ha_link_ffo_on = ADCDevice.ha_link_ffo_on()
         cmd_ha_on = ADCDevice.ha_on()
         cmd_segment_enable = ADCDevice.segment_enable()
+        cmd_apv_write_memory = ADCDevice.write_memory()
         self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ssh_ip, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, segment_enable=self.segment_enable)
@@ -596,6 +603,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_on, segment_enable=self.segment_enable)
         time.sleep(10)
         self.run_cli_extend(base_rest_url, cmd_segment_enable, segment_enable=self.segment_enable)
+        self.run_cli_extend(base_rest_url, cmd_apv_write_memory, segment_enable=self.segment_enable)
 
 
     def get_all_health_status(self, va_name, lb_id):
@@ -652,30 +660,78 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def get_restful_status(self, base_rest_url):
         cmd_show_ip_addr = ADCDevice.show_ip_addr()
         try:
-            self.run_cli_extend(base_rest_url, cmd_show_ip_addr)
+            self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
+                segment_enable=self.segment_enable)
         except Exception:
             return False
         return True
 
 
+    def get_ha_status(self, idx):
+        base_rest_url = self.base_rest_urls[idx]
+        cmd_show_ha_config = ADCDevice.show_ha_config()
+        r = self.run_cli_extend(base_rest_url, cmd_show_ha_config,
+            segment_enable=self.segment_enable)
+        if "ha off" in r.text:
+            LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
+            return False
+        return True
+
+    def find_active_host(self, host_filter_idx):
+        for idx, base_rest_url in enumerate(self.base_rest_urls):
+            if idx == host_filter_idx:
+                continue
+            host_status = self.get_restful_status(base_rest_url)
+            if host_status:
+                return idx
+        return -1
+
+    def synconfig_from(self, base_rest_url, cur_idx):
+        peer_name = "unit_s"
+        if cur_idx == 1:
+            peer_name = "unit_m"
+        cmd_synconfig_from_peer = ADCDevice.synconfig_from_peer(peer_name)
+        self.run_cli_extend(base_rest_url, cmd_synconfig_from_peer,
+            run_timeout=600, segment_enable=self.segment_enable)
+
     def recovery_lbs_configuration(self):
         if len(self.hostnames) <= 1:
             LOG.debug("It can't build the HA environment.")
             return True
-        LOG.debug("It will check the status of HA")
-        cmd_show_ha_config = ADCDevice.show_ha_config()
+
+        global off_hosts
+        LOG.debug("It will check the status of Host, current off hosts is : %s" % off_hosts)
         for idx, base_rest_url in enumerate(self.base_rest_urls):
-            r = self.run_cli_extend(base_rest_url, cmd_show_ha_config,
-                segment_enable=self.segment_enable)
-            if "ha off" in r.text:
-                LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
+            host_status = self.get_restful_status(base_rest_url)
+            hostname = self.hostnames[idx]
+            if not host_status:
+                LOG.debug("Failed to connect the host(%s)" % hostname)
+                if hostname not in off_hosts:
+                    off_hosts.append(hostname)
+                    LOG.debug("Append the host(%s) into off_host(%s)" % (hostname, off_hosts))
+            else:
+                if hostname in off_hosts:
+                    LOG.debug("Host(%s) is currently ON, but it is still on the \
+                        off_hosts(%s)" % (hostname, off_hosts))
+                    active_idx = self.find_active_host(host_filter_idx=idx)
+                    if active_idx != -1:
+                        LOG.debug("It synconfig from host(%d:%s)" % (active_idx,
+                            self.hostnames[active_idx]))
+                        self.synconfig_from(base_rest_url, idx)
+                    else:
+                        LOG.debug("Can't find any active host except the host(%s), so failed to \
+                            synconfig", hostname)
+                    off_hosts.remove(hostname)
+
+        LOG.debug("It will check the status of HA")
+        for idx, base_rest_url in enumerate(self.base_rest_urls):
+            ha_status = self.get_ha_status(idx)
+            if not ha_status:
+                LOG.debug("Will add the HA config in host(%s)" % self.hostnames[idx])
                 self.init_one_array_device(idx)
-                peer_name = "unit_s"
-                if idx == 1:
-                    peer_name = "unit_m"
-                cmd_synconfig_from_peer = ADCDevice.synconfig_from_peer(peer_name)
-                self.run_cli_extend(base_rest_url, cmd_synconfig_from_peer,
-                    run_timeout=600, segment_enable=self.segment_enable)
+                active_idx = self.find_active_host(host_filter_idx=idx)
+                if active_idx != -1:
+                    self.synconfig_from(base_rest_url, idx)
 
 
     def update_member_status(self, agent_host_name):

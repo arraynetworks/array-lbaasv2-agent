@@ -91,6 +91,20 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         heartbeat_lb_status = loopingcall.FixedIntervalLoopingCall(self.update_lb_status)
         heartbeat_lb_status.start(interval=45)
 
+        recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
+        recovery_lb_status.start(interval=60)
+
+        scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
+        scrub_dead_agents.start(interval=150)
+
+
+    def scrub_dead_agents(self):
+        try:
+            LOG.info("Scrub dead agents...");
+            self.plugin_rpc.scrub_dead_agents(context)
+        except Exception as e:
+            LOG.debug("failed to scrub dead agents: %s" % e.message)
+
 
     def update_lb_status(self):
         try:
@@ -101,6 +115,13 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
     def _report_state(self):
         LOG.info("entering _report_state");
         self.report_state_rpc.report_state(self.context, self.agent_state)
+
+    def recovery_lbs_configuration(self):
+        LOG.info("Recovery LB configuration...");
+        try:
+            self.driver.driver.recovery_lbs_configuration()
+        except Exception as e:
+            LOG.debug("failed to recovery LBs configuration: %s" % e.message)
 
     @log_helpers.log_method_call
     def create_loadbalancer_and_allocate_vip(self, context, obj):
