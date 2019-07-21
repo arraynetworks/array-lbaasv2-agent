@@ -48,10 +48,19 @@ class ADCDevice(object):
     """
 
     @staticmethod
+    def rts_enable():
+        cmd = "IP rts on"
+        return cmd
+
+    @staticmethod
     def segment_enable():
         cmd = "segment enable"
         return cmd
 
+    @staticmethod
+    def segment_disable():
+        cmd = "segment disable"
+        return cmd
 
     @staticmethod
     def create_segment(segment_name):
@@ -726,7 +735,7 @@ class ADCDevice(object):
 
     @staticmethod
     def monitor_vcondition_name_apv(group_id):
-        cmd = "monitor vcondition name v%d VCONDITION_1 AND" % (group_id)
+        cmd = "monitor vcondition name v%d VCONDITION_%d AND" % (group_id, group_id)
         return cmd
 
     @staticmethod
@@ -752,8 +761,8 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
-    def ha_decision_rule_apv(group_id):
-        cmd = "ha decision rule v%d Group_Failover %d" % (group_id, group_id)
+    def ha_decision_rule_apv(rule_idx, group_id):
+        cmd = "ha decision rule v%d Group_Failover %d" % (rule_idx, group_id)
         return cmd
 
     @staticmethod
@@ -790,4 +799,3 @@ class ADCDevice(object):
     def synconfig_from_peer(peer_name):
         cmd = "synconfig from %s" % peer_name
         return cmd
-

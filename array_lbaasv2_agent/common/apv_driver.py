@@ -44,6 +44,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.segment_user_name = ""
         self.segment_user_passwd = "click1"  #ToDo: get from configuration
         self.segment_enable = True
+        self.net_seg_enable = cfg.CONF.arraynetworks.net_seg_enable
 
 
     def get_va_name(self, argu):
@@ -105,7 +106,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         if vlan_tag:
             interface_name = "vlan." + vlan_tag
-            cmd_apv_config_vlan = ADCDevice.vlan_device(in_interface, interface_name, vlan_tag)  
+            cmd_apv_config_vlan = ADCDevice.vlan_device(in_interface, interface_name, vlan_tag)
         else:
             LOG.error("Lack of configuration vlan_tag")
             return
@@ -159,6 +160,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         lb_name = argu['vip_id']  #need verify
         self.segment_user_name = argu['vip_id'][:15]  #limit user length is 15
         self.segment_name = lb_name
+        if not self.net_seg_enable:
+            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_name)
         interface = self.plugin_rpc.get_interface(self.context)
         if not interface:
             LOG.error("Failed to get the interface from driver get_interface")
@@ -169,8 +172,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         # create vip
         vlan_tag = 0
         if len(self.hostnames) == 1:
-            self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
-            if cfg.CONF.arraynetworks.net_seg_enable:
+            if self.net_seg_enable:
+                self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
+            if self.net_seg_enable:
                 self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             self._create_vip(self.base_rest_urls, argu['ip_address'],
                 argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
@@ -179,9 +183,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
             if vlan_tag_map:
                 vlan_tag  = vlan_tag_map['vlan_tag']
-            self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
-            if cfg.CONF.arraynetworks.net_seg_enable:
-                self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
+            if self.net_seg_enable:
+                self._create_vlan_device(self.base_rest_urls, str(vlan_tag), va_name, interface)
+                self._segment_interface(self.base_rest_urls, str(vlan_tag), lb_name, va_name, interface)
             interface_mapping = argu['interface_mapping']
             unit_list = []
             pool_name = "pool_" + argu['vip_id']
@@ -233,7 +237,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 unit_list.append(unit_item)
             for base_rest_url in self.base_rest_urls:
                 self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name, lb_name, self.context, argu['subnet_id'])
-
+                self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
             pool_port_name = argu['vip_id'] + "_pool"
             self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
             port_name = 'lb' + '-'+ argu['vip_id'] + "_0"
@@ -252,7 +256,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return
         self._delete_segment(self.base_rest_urls, lb_name, va_name)
         self._delete_segment_user(self.base_rest_urls, va_name)
-        self._delete_vip(str(argu['vlan_tag']), va_name)
+        if self.net_seg_enable:
+            self._delete_vip(str(argu['vlan_tag']), va_name)
+        else:
+            self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
+
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface):
         """ create vip"""
@@ -264,7 +272,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             interface_name = "vlan." + vlan_tag
         segment_name = lb_name
         segment_ip = vip_address
-        if cfg.CONF.arraynetworks.net_seg_enable:
+        if self.net_seg_enable:
             internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, segment_ip)
             if internal_ip == 0:
                 LOG.error("Failed to get available internal ip address")
@@ -272,15 +280,18 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_apv_config_ip = ADCDevice.configure_segment_ip(interface_name, vip_address, netmask, internal_ip)
         else:
             cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
-        cmd_apv_config_route = ADCDevice.configure_route(gateway)
+        if self.net_seg_enable:
+            cmd_apv_config_route = ADCDevice.configure_route(gateway)
 
         if isinstance(base_rest_urls, list):
             for base_rest_url in base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_apv_config_ip, va_name, self.segment_enable)
-                self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
+                if self.net_seg_enable:
+                    self.run_cli_extend(base_rest_url, cmd_apv_config_route, va_name)
         else:
             self.run_cli_extend(base_rest_urls, cmd_apv_config_ip, va_name, self.segment_enable)
-            self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
+            if self.net_seg_enable:
+                self.run_cli_extend(base_rest_urls, cmd_apv_config_route, va_name)
             self.write_memory(segment_enable=self.segment_enable)
 
 
@@ -312,16 +323,20 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         member_address = argu['member_address']
         ip_version = IPy.IP(member_address).version()
         netmask = 32 if ip_version == 4 else 128
+        if not self.net_seg_enable:
+            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], argu['lb_id'])
 
         segment_name  = argu['lb_id']
-        if cfg.CONF.arraynetworks.net_seg_enable:
+        if self.net_seg_enable:
             internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, member_address, use_for_nat=True)
             if not internal_ip:
                 LOG.error("Failed to get available internal ip address in func create_member")
                 return
             cmd_segment_nat = ADCDevice.segment_nat(segment_name, internal_ip, member_address, netmask)
+            cmd_static_route = ADCDevice.configure_route_apv(member_address, argu['netmask'], argu['gateway'])
             for base_rest_url in self.base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_segment_nat, va_name, self.segment_enable)
+                self.run_cli_extend(base_rest_url, cmd_static_route, va_name)
         cmd_apv_create_real_server = ADCDevice.create_real_server(
                                                        argu['member_id'],
                                                        member_address,
@@ -354,6 +369,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
             self.write_memory(argu)
+        if not self.net_seg_enable and argu['num_of_mem'] > 1:
+            self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], member_id_filter=argu['member_id'])
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
         vlan_tag, segment_name, pool_name, pool_address, va_name, context, vip_subnet_id, in_interface):
@@ -378,7 +395,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_ha_group_priority = ADCDevice.ha_group_priority(unit_name, group_id, priority)
             self.run_cli_extend(base_rest_url, cmd_ha_group_priority, va_name, self.segment_enable)
 
-        if cfg.CONF.arraynetworks.net_seg_enable:
+        if self.net_seg_enable:
             cmd_ha_group_fip_vip = ADCDevice.ha_group_fip_apv(group_id, vip_address, segment_name, in_interface)
             cmd_ha_group_fip_pool = ADCDevice.ha_group_fip_apv(group_id, pool_address, segment_name, in_interface)
         else:
@@ -386,21 +403,14 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_ha_group_fip_pool = ADCDevice.ha_group_fip(group_id, pool_address, in_interface)           
         cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(group_id)
         cmd_ha_group_enable = ADCDevice.ha_group_enable(group_id)
-        cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name_apv(group_id)
-        port_list = self.plugin_rpc.get_interface_port(self.context, bond)
-        if not port_list:
-            LOG.error("Got the error port list by bond %s", bond)
-            return
-        cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member_apv(group_id, port_list)
-        cmd_ha_decision_rule = ADCDevice.ha_decision_rule_apv(group_id)
+        idx = int(bond[4:])
+        cmd_ha_decision_rule = ADCDevice.ha_decision_rule_apv(idx, group_id)
 
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name, self.segment_enable)
-        self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, va_name, self.segment_enable)
-        for cli in cmd_monitor_vcondition_member:
-            self.run_cli_extend(base_rest_url, cli, va_name, self.segment_enable)
+
         self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name, self.segment_enable)
         self.write_memory(segment_enable=self.segment_enable)
 
@@ -498,7 +508,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def check_vlan_existed_in_device(self, vlan_tag):
         device_name = "vlan." + str(vlan_tag)
         base_rest_url = self.base_rest_urls[0]
-        cmd_show_interface = ADCDevice.show_interface()
+        cmd_show_interface = ADCDevice.show_interface(device_name)
         r = self.run_cli_extend(base_rest_url, cmd_show_interface)
         if device_name in r.text:
             return True
@@ -574,6 +584,25 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def init_one_array_device(self, cur_idx):
         base_rest_url = self.base_rest_urls[cur_idx]
+        #rts
+        if not self.net_seg_enable:
+            cmd_rts_enable = ADCDevice.rts_enable()
+            self.run_cli_extend(base_rest_url, cmd_rts_enable, segment_enable=self.segment_enable)
+
+        #monitor vcondition
+        bonds = self.plugin_rpc.get_all_interfaces(self.context)
+        for bond in bonds:
+            idx = int(bond[4:])
+            cmd_monitor_vcondition_name = ADCDevice.monitor_vcondition_name_apv(idx)
+            port_list = self.plugin_rpc.get_interface_port(self.context, bond)
+            if not port_list:
+                LOG.error("Got the error port list by bond %s", bond)
+                return
+            cmd_monitor_vcondition_member = ADCDevice.monitor_vcondition_member_apv(idx, port_list)
+            self.run_cli_extend(base_rest_url, cmd_monitor_vcondition_name, None, self.segment_enable)
+            for cli in cmd_monitor_vcondition_member:
+                self.run_cli_extend(base_rest_url, cli, segment_enable=self.segment_enable)
+
         for idx, hostname in enumerate(self.hostnames):
             unit_name = "unit_"
             if idx == 0:
@@ -593,8 +622,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
         cmd_ha_link_ffo_on = ADCDevice.ha_link_ffo_on()
         cmd_ha_on = ADCDevice.ha_on()
-        cmd_segment_enable = ADCDevice.segment_enable()
         cmd_apv_write_memory = ADCDevice.write_memory()
+        if self.net_seg_enable:
+            cmd_segment = ADCDevice.segment_enable()
+        else:
+            cmd_segment = ADCDevice.segment_disable()
         self.run_cli_extend(base_rest_url, cmd_ha_link_network_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ssh_ip, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, segment_enable=self.segment_enable)
@@ -602,7 +634,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_link_ffo_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_on, segment_enable=self.segment_enable)
         time.sleep(10)
-        self.run_cli_extend(base_rest_url, cmd_segment_enable, segment_enable=self.segment_enable)
+        self.run_cli_extend(base_rest_url, cmd_segment, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_apv_write_memory, segment_enable=self.segment_enable)
 
 
