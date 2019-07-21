@@ -495,21 +495,45 @@ class ADCDevice(object):
             cmd = "slb policy qos url"
 
         if compare_type == lb_const.L7_RULE_COMPARE_TYPE_REGEX:
-            v_str = "\<regex\>%s" % value
+            if is_driver_apv():
+                v_str = "<regex>%s" % value
+            else:
+                v_str = "\<regex\>%s" % value
             if key:
-                v_key = "\<regex\>%s" % key
+                if is_driver_apv():
+                    v_key = "<regex>%s" % key
+                else:
+                    v_key = "\<regex\>%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_STARTS_WITH:
-            v_str = "\<regex\>^%s" % value
+            if is_driver_apv():
+                v_str = "<regex>^%s" % value
+            else:
+                v_str = "\<regex\>^%s" % value
             if key:
-                v_key = "\<regex\>^%s" % key
+                if is_driver_apv():
+                    v_key = "<regex>^%s" % key
+                else:
+                    v_key = "\<regex\>^%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_ENDS_WITH:
-            v_str = "\<regex\>%s$" % value
+            if is_driver_apv():
+                v_str = "<regex>%s$" % value
+            else:
+                v_str = "\<regex\>%s$" % value
             if key:
-                v_key = "\<regex\>%s$" % key
+                if is_driver_apv():
+                    v_key = "<regex>%s$" % key
+                else:
+                    v_key = "\<regex\>%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_EQUAL_TO:
-            v_str = "\<regex\>^%s$" % value
+            if is_driver_apv():
+                v_str = "<regex>^%s$" % value
+            else:
+                v_str = "\<regex\>^%s$" % value
             if key:
-                v_key = "\<regex\>^%s$" % key
+                if is_driver_apv():
+                    v_key = "\<regex\>^%s$" % key
+                else:
+                    v_key = "\<regex\>^%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
             v_str = value
             if key:
@@ -518,7 +542,10 @@ class ADCDevice(object):
         if rule_type == lb_const.L7_RULE_TYPE_COOKIE:
             v_str = "%s=%s" % (v_key, value)
         elif rule_type == lb_const.L7_RULE_TYPE_FILE_TYPE:
-            v_str = "\<regex\>\.%s$" % value
+            if is_driver_apv():
+                v_str = "<regex>\.%s$" % value
+            else:
+                v_str = "\<regex\>\.%s$" % value
 
         if invert:
             v_str = "!%s" % v_str
