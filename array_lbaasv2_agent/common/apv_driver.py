@@ -584,6 +584,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_rts_enable = ADCDevice.rts_enable()
             self.run_cli_extend(base_rest_url, cmd_rts_enable, segment_enable=self.segment_enable)
 
+        cmd_load_error_page = ADCDevice.load_http_error_page()
+        self.run_cli_extend(base_rest_url, cmd_load_error_page, segment_enable=self.segment_enable)
         #monitor vcondition
         bonds = self.plugin_rpc.get_all_interfaces(self.context)
         for bond in bonds:
