@@ -47,7 +47,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
 
     def get_va_name(self, argu):
-        if arug:
+        if argu:
             segment_user_name = argu['vip_id'][:15]  #segment user name limit
             return segment_user_name
         else:
