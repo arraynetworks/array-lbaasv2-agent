@@ -228,7 +228,6 @@ class ArrayADCDriver(object):
             LOG.debug("Cann't get the vlan_tag by port_id(%s)", port_id)
             argu['vlan_tag'] = None
         else:
-            self.plugin_rpc.delete_vlan_by_port(self.context, port_id)
             argu['vlan_tag'] = vlan_tag
 
         argu['tenant_id'] = lb['tenant_id']
