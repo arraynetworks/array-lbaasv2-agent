@@ -766,6 +766,19 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_ha_decision():
+        cmd = "show ha decision"
+        return cmd
+
+    @staticmethod
+    def no_ha_decision_rule(vcondition, group_id):
+        index_number = vcondition.index("_")
+        condition = vcondition[index_number + 1:]
+        cmd = "no ha decision rule v%s Group_Failover %d" % (condition, group_id)
+        return cmd
+
+
+    @staticmethod
     def write_memory():
         cmd = "write memory"
         return cmd

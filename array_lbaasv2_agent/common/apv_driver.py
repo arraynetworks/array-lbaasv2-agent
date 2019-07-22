@@ -333,7 +333,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 LOG.error("Failed to get available internal ip address in func create_member")
                 return
             cmd_segment_nat = ADCDevice.segment_nat(segment_name, internal_ip, member_address, netmask)
-            cmd_static_route = ADCDevice.configure_route_apv(member_address, argu['netmask'], argu['gateway'])
+            cmd_static_route = ADCDevice.configure_route_apv(member_address, netmask, argu['gateway'])
             for base_rest_url in self.base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_segment_nat, va_name, self.segment_enable)
                 self.run_cli_extend(base_rest_url, cmd_static_route, va_name)
@@ -353,6 +353,38 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self.run_cli_extend(base_rest_url, cmd_apv_create_real_server, va_name)
             self.run_cli_extend(base_rest_url, cmd_apv_add_rs_into_group, va_name)
             self.write_memory(argu)
+
+
+    def create_pool(self, argu):
+        """ Create SLB group in lb-pool-create"""
+
+        if not argu:
+            LOG.error("In create_pool, it should not pass the None.")
+            return
+
+        va_name = self.get_va_name(argu)
+        cmd_apv_create_group = ADCDevice.create_group(argu['pool_id'],
+                                                      argu['lb_algorithm'],
+                                                      argu['session_persistence_type']
+                                                     )
+        cmd_slb_proxyip_group = None
+        if len(self.hostnames) > 1:
+            pool_name = "pool_" + argu['vip_id']
+            cmd_slb_proxyip_group = ADCDevice.slb_proxyip_group(argu['pool_id'], pool_name)
+
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_apv_create_group, va_name)
+            if len(self.hostnames) > 1:
+                self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
+                LOG.debug("In create_pool, waiting for enable ha")
+                time.sleep(10)
+                LOG.debug("In create_pool, done for waiting for enable ha")
+
+        # create policy
+        if argu['listener_id']:
+            self._create_policy(argu['pool_id'], argu['listener_id'],
+                                argu['session_persistence_type'],
+                                argu['lb_algorithm'], argu['cookie_name'], va_name)
 
 
     def delete_member(self, argu):
@@ -397,7 +429,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         else:
             cmd_ha_group_fip_vip = ADCDevice.ha_group_fip(group_id, vip_address, in_interface)
             cmd_ha_group_fip_pool = ADCDevice.ha_group_fip(group_id, pool_address, in_interface)           
-        cmd_ha_group_preempt_on = ADCDevice.ha_group_preempt_on(group_id)
         cmd_ha_group_enable = ADCDevice.ha_group_enable(group_id)
         idx = int(bond[4:])
         cmd_ha_decision_rule = ADCDevice.ha_decision_rule_apv(idx, group_id)
@@ -405,7 +436,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name, self.segment_enable)
-        self.run_cli_extend(base_rest_url, cmd_ha_group_preempt_on, va_name, self.segment_enable)
 
         self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name, self.segment_enable)
         self.write_memory(segment_enable=self.segment_enable)
@@ -415,6 +445,23 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         LOG.debug("find the available group id: %d", group_id)
         cmd_delete_ha_group_id = ADCDevice.ha_no_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_delete_ha_group_id, va_name, self.segment_enable)
+        # get ha decision by group id
+        cmd_show_ha_decision = ADCDevice.show_ha_decision()
+        ret = self.run_cli_extend(base_rest_url, cmd_show_ha_decision, va_name, self.segment_enable)
+        data = ret.text
+        index_start = data.index(":")
+        index_end = data.rindex("\"")
+        ha_decisions = data[index_start +2:index_end]
+        ha_decision = ha_decisions.split("\\n")
+        for idx, decision in  enumerate(ha_decision):
+            if idx == 0 or not decision:
+                continue
+            options = decision.split()
+            id, vcondition_name, action_name, groupid = options
+            if groupid == str(group_id):
+                cmd_no_show_ha_decision = ADCDevice.no_ha_decision_rule(vcondition_name, group_id)
+                self.run_cli_extend(base_rest_url, cmd_no_show_ha_decision, va_name, self.segment_enable)
+
         self.write_memory(segment_enable=self.segment_enable)
 
 

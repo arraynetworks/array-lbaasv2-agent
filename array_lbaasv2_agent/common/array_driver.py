@@ -701,4 +701,3 @@ class ArrayCommonAPIDriver(object):
         except Exception:
             return False
         return True
-
