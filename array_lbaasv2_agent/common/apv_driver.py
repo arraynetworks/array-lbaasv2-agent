@@ -381,11 +381,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         if vlan_tag:
             in_interface = "vlan." + vlan_tag
         group_id = self.find_available_cluster_id(context, segment_name)
-        if group_id == 0:
-            LOG.error("Failed to find available group id")
-            return
-        else:
-            LOG.debug("find the available group id: %d", group_id)
+        LOG.debug("find the available group id: %d", group_id)
         cmd_ha_group_id = ADCDevice.ha_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name, self.segment_enable)
 
@@ -419,11 +415,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def clear_ha(self, base_rest_url, unit_list, vip_address, va_name, segment_name, context, vip_subnet_id):
         group_id = self.find_available_cluster_id(context, segment_name)
-        if group_id == 0:
-            LOG.error("Failed to find available group id")
-            return
-        else:
-            LOG.debug("find the available group id: %d", group_id)
+        LOG.debug("find the available group id: %d", group_id)
         cmd_delete_ha_group_id = ADCDevice.ha_no_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_delete_ha_group_id, va_name, self.segment_enable)
         self.write_memory(segment_enable=self.segment_enable)
