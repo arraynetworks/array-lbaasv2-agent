@@ -165,6 +165,13 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         if not interface:
             LOG.error("Failed to get the interface from driver get_interface")
             return
+        #get the internal ip
+        internal_ip = None
+        if self.net_seg_enable:
+            internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, segment_ip)
+            if internal_ip == None:
+                LOG.error("Failed to get available internal ip address for create loadbalancer")
+                return
         # create segment name and user and interface
         self._create_segment(self.base_rest_urls, lb_name, va_name)
         self._create_segment_user(self.base_rest_urls, lb_name, va_name)
@@ -176,7 +183,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             if self.net_seg_enable:
                 self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             self._create_vip(self.base_rest_urls, argu['ip_address'],
-                argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
+                argu['netmask'], argu['vlan_tag'], argu['gateway'], 
+                va_name, lb_name, interface, internal_ip)
         else:
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
             if vlan_tag_map:
@@ -201,7 +209,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
-                   argu ['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
+                   argu ['vlan_tag'], argu['gateway'], va_name, lb_name, interface, internal_ip)
                 unit_list.append(unit_item)
 
             self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
@@ -260,7 +268,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
 
 
-    def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface):
+    def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface, internal_ip):
         """ create vip"""
 
         interface_name = in_interface
@@ -271,10 +279,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         segment_name = lb_name
         segment_ip = vip_address
         if self.net_seg_enable:
-            internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, segment_ip)
-            if internal_ip == 0:
-                LOG.error("Failed to get available internal ip address")
-                return
             cmd_apv_config_ip = ADCDevice.configure_segment_ip(interface_name, vip_address, netmask, internal_ip)
         else:
             cmd_apv_config_ip = ADCDevice.configure_ip(interface_name, vip_address, netmask)
@@ -320,7 +324,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         member_address = argu['member_address']
         ip_version = IPy.IP(member_address).version()
-        netmask = 32 if ip_version == 4 else 128
+        netmask = "255.255.255.255" if ip_version == 4 else "128"
         if not self.net_seg_enable:
             self.create_port_for_subnet(argu['subnet_id'], lb_id=argu['vip_id'])
 
@@ -443,22 +447,23 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_delete_ha_group_id = ADCDevice.ha_no_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_delete_ha_group_id, va_name, self.segment_enable)
         # get ha decision by group id
-        cmd_show_ha_decision = ADCDevice.show_ha_decision()
-        ret = self.run_cli_extend(base_rest_url, cmd_show_ha_decision, va_name, self.segment_enable)
+        cmd_show_ha_decision = ADCDevice.show_ha_config()
+        ret = self.run_cli_extend(base_rest_url, cmd_show_ha_decision, None, self.segment_enable)
         data = ret.text
         index_start = data.index(":")
         index_end = data.rindex("\"")
-        ha_decisions = data[index_start +2:index_end]
-        ha_decision = ha_decisions.split("\\n")
-        for idx, decision in  enumerate(ha_decision):
-            if idx == 0 or not decision:
+        all_ha_config = data[index_start +2:index_end]
+        ha_config = all_ha_config.split("\\n")
+        for conf in ha_config:
+            if "decision" not in conf:
                 continue
-            options = decision.split()
-            id, vcondition_name, action_name, groupid = options
+            options = conf.split()
+            groupid = options[-1]
+            vcondition_str = options[3]
+            vcondition_name = vcondition_str[2:-2]
             if groupid == str(group_id):
                 cmd_no_show_ha_decision = ADCDevice.no_ha_decision_rule(vcondition_name, group_id)
                 self.run_cli_extend(base_rest_url, cmd_no_show_ha_decision, va_name, self.segment_enable)
-
         self.write_memory(segment_enable=self.segment_enable)
 
 

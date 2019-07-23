@@ -772,9 +772,7 @@ class ADCDevice(object):
 
     @staticmethod
     def no_ha_decision_rule(vcondition, group_id):
-        index_number = vcondition.index("_")
-        condition = vcondition[index_number + 1:]
-        cmd = "no ha decision rule v%s Group_Failover %d" % (condition, group_id)
+        cmd = "no ha decision rule %s Group_Failover %s" % (vcondition, group_id)
         return cmd
 
 
