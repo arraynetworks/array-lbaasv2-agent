@@ -185,6 +185,10 @@ class ArrayPluginApi(object):
             sec_port_id=sec_port_id, in_use_lb=in_use_lb,
             cluster_id=cluster_id)
 
+    def get_port_by_name(self, context, port_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_port_by_name', port_name=port_name)
+
     def delete_vapv(self, context, vapv_name):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'delete_vapv', vapv_name=vapv_name)
@@ -230,4 +234,5 @@ class ArrayPluginApi(object):
 
     def get_all_interfaces(self, context):
         cctxt = self.client.prepare()
-        return cctxt.call(context, 'get_all_interfaces')        
+        return cctxt.call(context, 'get_all_interfaces')
+

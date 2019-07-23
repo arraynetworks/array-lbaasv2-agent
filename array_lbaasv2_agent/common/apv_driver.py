@@ -21,7 +21,6 @@ import netaddr
 from oslo_config import cfg
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 from array_lbaasv2_agent.common.adc_device import ADCDevice
-from array_lbaasv2_agent.common.adc_device import is_driver_apv
 from array_lbaasv2_agent.common import exceptions as driver_except
 from neutron_lbaas.services.loadbalancer import constants as lb_const
 
@@ -178,7 +177,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             self._create_vip(self.base_rest_urls, argu['ip_address'],
                 argu['netmask'], argu['vlan_tag'], argu['gateway'], va_name, lb_name, interface)
-            self.write_memory(argu, self.segment_enable)
         else:
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
             if vlan_tag_map:
@@ -211,10 +209,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     sec_port_id=sec_port_id, cluster_id=vlan_tag)
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
-                    argu['vip_address'], argu['vlan_tag'], lb_name, pool_name, 
+                    argu['vip_address'], argu['vlan_tag'], lb_name, pool_name,
                     argu['pool_address'], va_name, self.context, argu['subnet_id'],
                     interface)
-            self.write_memory(argu, self.segment_enable)
+        self.write_memory(argu, self.segment_enable)
 
 
     def delete_loadbalancer(self, argu):
@@ -309,7 +307,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for base_rest_url in self.base_rest_urls:
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name, self.segment_enable)
-            self.write_memory(segment_enable=self.segment_enable)
+        self.write_memory(segment_enable=self.segment_enable)
 
 
     def create_member(self, argu):
@@ -324,7 +322,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         ip_version = IPy.IP(member_address).version()
         netmask = 32 if ip_version == 4 else 128
         if not self.net_seg_enable:
-            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], argu['lb_id'])
+            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], argu['vip_id'])
 
         segment_name  = argu['lb_id']
         if self.net_seg_enable:
@@ -352,7 +350,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_create_real_server, va_name)
             self.run_cli_extend(base_rest_url, cmd_apv_add_rs_into_group, va_name)
-            self.write_memory(argu)
+        self.write_memory(argu)
 
 
     def create_pool(self, argu):
@@ -400,9 +398,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
-            self.write_memory(argu)
+        self.write_memory(argu)
         if not self.net_seg_enable and argu['num_of_mem'] > 1:
-            self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], member_id_filter=argu['member_id'])
+            self.delete_port_for_subnet(argu['subnet_id'], member_id_filter=argu['member_id'])
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
         vlan_tag, segment_name, pool_name, pool_address, va_name, context, vip_subnet_id, in_interface):
@@ -428,7 +426,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_ha_group_fip_pool = ADCDevice.ha_group_fip_apv(group_id, pool_address, segment_name, in_interface)
         else:
             cmd_ha_group_fip_vip = ADCDevice.ha_group_fip(group_id, vip_address, in_interface)
-            cmd_ha_group_fip_pool = ADCDevice.ha_group_fip(group_id, pool_address, in_interface)           
+            cmd_ha_group_fip_pool = ADCDevice.ha_group_fip(group_id, pool_address, in_interface)
         cmd_ha_group_enable = ADCDevice.ha_group_enable(group_id)
         idx = int(bond[4:])
         cmd_ha_decision_rule = ADCDevice.ha_decision_rule_apv(idx, group_id)
@@ -438,7 +436,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name, self.segment_enable)
 
         self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name, self.segment_enable)
-        self.write_memory(segment_enable=self.segment_enable)
 
     def clear_ha(self, base_rest_url, unit_list, vip_address, va_name, segment_name, context, vip_subnet_id):
         group_id = self.find_available_cluster_id(context, segment_name)
@@ -584,7 +581,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 segment_enable=self.segment_enable)
 
 
-    def delete_port_for_subnet(self, subnet_id, vlan_tag,
+    def delete_port_for_subnet(self, subnet_id, vlan_tag = None,
         lb_id_filter=None, member_id_filter=None):
         '''
         The function should be invoked when delete loadbalance and delete member.
@@ -593,9 +590,26 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         When delete delete member, the member_id_filter should be filled and should be
         the id of the member which will be deleted.
         '''
-        if not subnet_id or not vlan_tag:
+        if not subnet_id:
             LOG.error("The argument for delete_port_for_subnet isn't right.")
             return False
+
+        port_name = subnet_id + "_port"
+        if vlan_tag is None:
+            ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
+            if len(ret_ports) > 0:
+                port_id = ret_ports[0]['id']
+                ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
+                vlan_tag = ret_vlan['vlan_tag']
+                if vlan_tag == '-1':
+                    LOG.debug("Cannot get the vlan_tag by port_id(%s)", port_id)
+                    return
+                else:
+                    LOG.debug("Got the vlan_tag(%s) by port_id(%s)", vlan_tag, port_id)
+            else:
+                LOG.debug("Cannot to get port by name(%s)" % port_name)
+                return
+
         if not self.check_vlan_existed_in_device(vlan_tag):
             LOG.debug("The port wasn't created in device, ignore to delete port")
             return True
@@ -609,10 +623,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.debug("The port is still used by other resource, ignore to delete it")
             return True
 
-        port_name = subnet_id + "_port"
         device_name = "vlan." + vlan_tag
+        cmd_no_ip = ADCDevice.no_ip(device_name)
         cmd_no_vlan_device = ADCDevice.no_vlan_device(device_name)
         for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_no_ip,
+                segment_enable=self.segment_enable)
             self.run_cli_extend(base_rest_url, cmd_no_vlan_device,
                 segment_enable=self.segment_enable)
         self.plugin_rpc.delete_port_by_name(self.context, port_name)

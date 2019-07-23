@@ -422,14 +422,10 @@ class ArrayADCDriver(object):
         argu['protocol'] = pool['protocol']
         argu['pool_id'] = member['pool_id']
         argu['member_weight'] = member['weight']
-        argu['lb_id'] = member['pool']['loadbalancer_id']
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
-        all_members = member['pool']['members']
-        argu['subnet_id'] = ""
-        for mem in all_members:
-            if argu['member_id'] == mem['id']:
-                argu['subnet_id'] = mem['subnet_id']
+        argu['subnet_id'] = member['subnet_id']
+
         subnet = self.plugin_rpc.get_subnet(self.context, argu['subnet_id'])
         member_network = netaddr.IPNetwork(subnet['cidr'])
         argu['netmask'] = str(member_network.netmask)
@@ -438,10 +434,6 @@ class ArrayADCDriver(object):
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
 
-        vip_port_id = member['pool']['loadbalancer']['vip_port']['id']
-        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, vip_port_id)
-        LOG.debug("got the vlan ret (%s)for create member", ret_vlan)
-        argu['vlan_tag'] = ret_vlan['vlan_tag']
         self.driver.create_member(argu)
         self.driver.write_memory(argu)
 
@@ -464,12 +456,8 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
         argu['subnet_id'] = member['subnet_id']
-        vip_port_id = member['pool']['loadbalancer']['vip_port']['id']
-        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, vip_port_id)
-        LOG.debug("got the vlan ret (%s)for delete member", ret_vlan)
-        argu['vlan_tag'] = ret_vlan['vlan_tag']
-        members = member['pool']['members']
 
+        members = member['pool']['members']
         #members count in same subnet
         num_mem_same_sub = 0
         for mem in members:
