@@ -158,32 +158,32 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         pri_port_id = None
         sec_port_id = None
         lb_name = argu['vip_id']  #need verify
-        self.segment_name = lb_name
         if not self.net_seg_enable:
             self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_name)
         interface = self.plugin_rpc.get_interface(self.context)
         if not interface:
             LOG.error("Failed to get the interface from driver get_interface")
             return
-        #get the internal ip
-        internal_ip = None
-        if self.net_seg_enable:
-            internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, segment_ip)
-            if internal_ip == None:
-                LOG.error("Failed to get available internal ip address for create loadbalancer")
-                return
+
+
         # create segment name and user and interface
         self._create_segment(self.base_rest_urls, lb_name, va_name)
         self._create_segment_user(self.base_rest_urls, lb_name, va_name)
         # create vip
         vlan_tag = 0
+        internal_ip = None
         if len(self.hostnames) == 1:
+            if self.net_seg_enable:
+                internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, lb_name, argu['ip_address'])
+                if internal_ip == None:
+                    LOG.error("Failed to get available internal ip address for create loadbalancer")
+                    return
             if self.net_seg_enable:
                 self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
             if self.net_seg_enable:
                 self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
             self._create_vip(self.base_rest_urls, argu['ip_address'],
-                argu['netmask'], argu['vlan_tag'], argu['gateway'], 
+                argu['netmask'], argu['vlan_tag'], argu['gateway'],
                 va_name, lb_name, interface, internal_ip)
         else:
             vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
@@ -208,6 +208,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     unit_item['name'] = "unit_s"
                     unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
+                if self.net_seg_enable and not internal_ip:
+                    internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, lb_name, ip_address)
+                    if internal_ip == None:
+                        LOG.error("Failed to get available internal ip address for create loadbalancer")
+                        return
                 self._create_vip(base_rest_url, ip_address, argu['netmask'],
                    argu ['vlan_tag'], argu['gateway'], va_name, lb_name, interface, internal_ip)
                 unit_list.append(unit_item)
@@ -276,8 +281,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         LOG.debug("Configure the vip address into interface")
         if vlan_tag:
             interface_name = "vlan." + vlan_tag
-        segment_name = lb_name
-        segment_ip = vip_address
+
         if self.net_seg_enable:
             cmd_apv_config_ip = ADCDevice.configure_segment_ip(interface_name, vip_address, netmask, internal_ip)
         else:
@@ -328,7 +332,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         if not self.net_seg_enable:
             self.create_port_for_subnet(argu['subnet_id'], lb_id=argu['vip_id'])
 
-        segment_name  = argu['lb_id']
+        segment_name  = argu['vip_id']
         if self.net_seg_enable:
             internal_ip = self.plugin_rpc.get_available_internal_ip(self.context, segment_name, member_address, use_for_nat=True)
             if not internal_ip:
