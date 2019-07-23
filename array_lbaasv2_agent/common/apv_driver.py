@@ -506,6 +506,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                   "%(exception)s",
                   {'max_retries': conn_max_retries,
                    'exception': exception})
+        return None
 
 
 
@@ -769,10 +770,13 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def get_restful_status(self, base_rest_url):
         cmd_show_ip_addr = ADCDevice.show_ip_addr()
+        status = None
         try:
-            self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
+            status = self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
                 segment_enable=self.segment_enable)
         except Exception:
+            return False
+        if not status:
             return False
         return True
 
