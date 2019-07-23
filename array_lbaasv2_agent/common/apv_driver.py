@@ -322,7 +322,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         ip_version = IPy.IP(member_address).version()
         netmask = 32 if ip_version == 4 else 128
         if not self.net_seg_enable:
-            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], argu['vip_id'])
+            self.create_port_for_subnet(argu['subnet_id'], lb_id=argu['vip_id'])
 
         segment_name  = argu['lb_id']
         if self.net_seg_enable:
