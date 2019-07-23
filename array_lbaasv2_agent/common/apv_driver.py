@@ -544,29 +544,53 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return True
         return False
 
-    def create_port_for_subnet(self, subnet_id, vlan_tag, lb_id):
+    def create_port_for_subnet(self, subnet_id, vlan_tag = None, lb_id = None):
         '''
         The function should be invoked when create loadbalance and member.
         '''
-        if not subnet_id or not vlan_tag or not lb_id:
+        if not subnet_id or not lb_id:
             LOG.debug("The argument for create_port_for_subnet isn't right.")
             return False
-        if self.check_vlan_existed_in_device(vlan_tag):
-            LOG.debug("The port has been created in device, ignore to create port")
-            return True
 
-        vlan_tag = str(vlan_tag)
-        device_name = "vlan." + vlan_tag
-        hostname = cfg.CONF.arraynetworks.agent_host
         port_name = subnet_id + "_port"
+        hostname = cfg.CONF.arraynetworks.agent_host
+        ret_vlan_tag = vlan_tag
+        subnet_port = None
+
+        if ret_vlan_tag is None:
+            ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
+            if len(ret_ports) > 0:
+                subnet_port = ret_ports[0]
+                port_id = subnet_port['id']
+                ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
+                ret_vlan_tag = ret_vlan['vlan_tag']
+                if ret_vlan_tag == '-1':
+                    LOG.debug("Cannot get the vlan_tag by port_id(%s)", port_id)
+                    return False
+                else:
+                    LOG.debug("Got the vlan_tag(%s) by port_id(%s)", ret_vlan_tag, port_id)
+                    if self.check_vlan_existed_in_device(ret_vlan_tag):
+                        LOG.debug("The port has been created in device, ignore to create port")
+                        return True
+            else:
+                LOG.debug("Cannot to get port by name(%s), creating the port" % port_name)
+                subnet_port = self.plugin_rpc.create_port_on_subnet(self.context,
+                    subnet_id, port_name, hostname, lb_id)
+        else:
+            if self.check_vlan_existed_in_device(ret_vlan_tag):
+                LOG.debug("The port has been created in device, ignore to create port")
+                return True
+            subnet_port = self.plugin_rpc.create_port_on_subnet(self.context,
+                subnet_id, port_name, hostname, lb_id)
+
+
+        ret_vlan_tag = str(ret_vlan_tag)
+        device_name = "vlan." + ret_vlan_tag
         interface_name = self.plugin_rpc.get_interface(self.context)
+        ip_address = subnet_port['fixed_ips'][0]['ip_address']
 
         subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
         member_network = netaddr.IPNetwork(subnet['cidr'])
-        subnet_port = self.plugin_rpc.create_port_on_subnet(self.context,
-            subnet_id, port_name, hostname, lb_id)
-
-        ip_address = subnet_port['fixed_ips'][0]['ip_address']
         netmask = str(member_network.netmask)
         if member_network.version == 6:
             idx = subnet['cidr'].find('/')
@@ -603,12 +627,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 vlan_tag = ret_vlan['vlan_tag']
                 if vlan_tag == '-1':
                     LOG.debug("Cannot get the vlan_tag by port_id(%s)", port_id)
-                    return
+                    return False
                 else:
                     LOG.debug("Got the vlan_tag(%s) by port_id(%s)", vlan_tag, port_id)
             else:
                 LOG.debug("Cannot to get port by name(%s)" % port_name)
-                return
+                return True
 
         if not self.check_vlan_existed_in_device(vlan_tag):
             LOG.debug("The port wasn't created in device, ignore to delete port")
