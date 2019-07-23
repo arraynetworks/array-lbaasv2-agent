@@ -438,7 +438,7 @@ class ArrayADCDriver(object):
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
 
-        vip_port_id = argu['subnet_id'] + "port"
+        vip_port_id = member['pool']['loadbalancer']['vip_port']['id']
         ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, vip_port_id)
         LOG.debug("got the vlan ret (%s)for create member", ret_vlan)
         argu['vlan_tag'] = ret_vlan['vlan_tag']
@@ -464,7 +464,7 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
         argu['subnet_id'] = member['subnet_id']
-        vip_port_id = argu['subnet_id'] + "port"
+        vip_port_id = member['pool']['loadbalancer']['vip_port']['id']
         ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, vip_port_id)
         LOG.debug("got the vlan ret (%s)for delete member", ret_vlan)
         argu['vlan_tag'] = ret_vlan['vlan_tag']

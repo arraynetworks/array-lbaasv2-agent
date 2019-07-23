@@ -477,8 +477,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         }
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
-        conn_max_retries = 2
-        conn_retry_interval = 3
+        conn_max_retries = 1
+        conn_retry_interval = 2
         auth_value = self.get_auth()
         if auth_val:
             auth_value = auth_val
@@ -510,7 +510,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                   {'max_retries': conn_max_retries,
                    'exception': exception})
 
-        raise driver_except.TimeOutException()
 
 
     def find_available_cluster_id(self, context, lb_name):
