@@ -481,7 +481,7 @@ class ADCDevice(object):
     def redirect_to_url(vs_name, policy_name, dest_url):
         (proto, host, path) = parse_dest_url(dest_url)
         if is_driver_apv():
-            cmd = "http redirect url %s %s 1 \"\<regex\>.*\" \"\<regex\>.*\" \"%s\" \"%s\" \"%s\" 302" % \
+            cmd = "http redirect url %s %s 1 \"<regex>.*\" \"<regex>.*\" \"%s\" \"%s\" \"%s\" 302" % \
                 (vs_name, policy_name, proto, host, path)
         else:
             cmd = "http redirect url %s %s 1 @@\<regex\>.*@@ @@\<regex\>.*@@ @@%s@@ @@%s@@ @@%s@@ 302" % \
@@ -540,7 +540,7 @@ class ADCDevice(object):
                 v_str = "\<regex\>^%s$" % value
             if key:
                 if is_driver_apv():
-                    v_key = "\<regex\>^%s$" % key
+                    v_key = "<regex>^%s$" % key
                 else:
                     v_key = "\<regex\>^%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
@@ -810,3 +810,4 @@ class ADCDevice(object):
     def synconfig_from_peer(peer_name):
         cmd = "synconfig from %s" % peer_name
         return cmd
+
