@@ -521,6 +521,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def find_available_cluster_id(self, context, lb_name):
         cluster_ids = self.plugin_rpc.get_clusterids_by_lb(context, lb_name)
+        if not cluster_ids:
+            LOG.error("Failed to get the cluster_id")
+            return -1
         LOG.debug("get the cluster ids (%s)", cluster_ids)
         return cluster_ids[0]
 
@@ -659,9 +662,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         device_name = "vlan." + vlan_tag
         cmd_no_ip = ADCDevice.no_ip(device_name)
+        cmd_no_ip_v6 = ADCDevice.no_ip(device_name, version=6)
         cmd_no_vlan_device = ADCDevice.no_vlan_device(device_name)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_no_ip,
+                segment_enable=self.segment_enable)
+            self.run_cli_extend(base_rest_url, cmd_no_ip_v6,
                 segment_enable=self.segment_enable)
             self.run_cli_extend(base_rest_url, cmd_no_vlan_device,
                 segment_enable=self.segment_enable)

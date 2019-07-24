@@ -153,8 +153,8 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
-    def no_ip(interface):
-        cmd = "no ip address %s" % interface
+    def no_ip(interface, version=4):
+        cmd = "no ip address %s %d" % (interface, version)
         return cmd
 
     @staticmethod
