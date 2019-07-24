@@ -405,12 +405,25 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         va_name = self.get_va_name(argu)
         cmd_apv_no_rs = ADCDevice.no_real_server(argu['protocol'],
             argu['member_id'], argu['member_port'])
-
+        if self.net_seg_enable and argu['num_of_mem'] > 1:
+            member_address = argu['member_address']
+            ip_version = IPy.IP(member_address).version()
+            netmask = "255.255.255.255" if ip_version == 4 else "128"
+            internal_ip = self.plugin_rpc.get_internal_ip_by_lb(self.context, argu['vip_id'], member_address, use_for_nat=True)
+            if not internal_ip:
+                LOG.error("Failed to find the internal ip by segment name(%s) and segment ip(%s)" % (argu['vip_id'], member_address))
+                return
+            cmd_delete_segment_nat = ADCDevice.delete_segment_nat(argu['vip_id'], internal_ip, member_address, netmask)
+            cmd_delete_route_static = ADCDevice.delete_route_static(member_address, netmask, argu['gateway'])
+            for base_rest_url in self.base_rest_urls:
+                self.run_cli_extend(base_rest_url, cmd_delete_segment_nat, va_name)
+                self.run_cli_extend(base_rest_url, cmd_delete_route_static, va_name)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
         self.write_memory(argu)
         if not self.net_seg_enable and argu['num_of_mem'] > 1:
             self.delete_port_for_subnet(argu['subnet_id'], member_id_filter=argu['member_id'])
+
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
         vlan_tag, segment_name, pool_name, pool_address, va_name,
@@ -801,7 +814,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_show_ha_config = ADCDevice.show_ha_config()
         r = self.run_cli_extend(base_rest_url, cmd_show_ha_config,
             segment_enable=self.segment_enable)
-        if "ha off" in r.text:
+        if not r or "ha off" in r.text:
             LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
             return False
         return True

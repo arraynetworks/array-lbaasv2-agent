@@ -132,6 +132,13 @@ class ADCDevice(object):
         cmd = "ip route static %s %s %s" % (ip_address, netmask, gateway_ip)
         return cmd
 
+
+    @staticmethod
+    def delete_route_static(ip_address, netmask, gateway_ip):
+        cmd = "no ip route static %s %s %s" % (ip_address, netmask, gateway_ip)
+        return cmd
+
+
     @staticmethod
     def clear_route():
         cmd = "clear ip route"

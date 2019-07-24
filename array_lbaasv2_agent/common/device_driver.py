@@ -456,6 +456,11 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
         argu['subnet_id'] = member['subnet_id']
+        argu['member_address'] = member['address']
+
+        subnet = self.plugin_rpc.get_subnet(self.context, argu['subnet_id'])
+        member_network = netaddr.IPNetwork(subnet['cidr'])
+        argu['gateway'] = subnet['gateway_ip']
 
         members = member['pool']['members']
         #members count in same subnet
