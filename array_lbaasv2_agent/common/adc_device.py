@@ -94,7 +94,7 @@ class ADCDevice(object):
 
     @staticmethod
     def delete_segment_nat(segment_name, internal_ip, segment_ip, netmask):
-        cmd = "no segment nat %s %s %s %s" % (segment_name, internal_ip, segment_ip, netmask)
+        cmd = "no segment nat %s %s %s %s" % (segment_name, segment_ip, internal_ip, netmask)
         return cmd
 
     @staticmethod

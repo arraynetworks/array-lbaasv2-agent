@@ -416,7 +416,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_delete_segment_nat = ADCDevice.delete_segment_nat(argu['vip_id'], internal_ip, member_address, netmask)
             cmd_delete_route_static = ADCDevice.delete_route_static(member_address, netmask, argu['gateway'])
             for base_rest_url in self.base_rest_urls:
-                self.run_cli_extend(base_rest_url, cmd_delete_segment_nat, va_name)
+                self.run_cli_extend(base_rest_url, cmd_delete_segment_nat, va_name, segment_enable=self.segment_enable)
                 self.run_cli_extend(base_rest_url, cmd_delete_route_static, va_name)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)

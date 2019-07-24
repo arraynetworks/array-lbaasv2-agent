@@ -464,11 +464,11 @@ class ArrayADCDriver(object):
 
         members = member['pool']['members']
         #members count in same subnet
-        num_mem_same_sub = 0
+        num_mem_same_ip = 0
         for mem in members:
-            if mem['subnet_id'] == argu['subnet_id']:
-                num_mem_same_sub += 1
-        argu['num_of_mem'] = num_mem_same_sub
+            if mem['address'] == argu['member_address']:
+                num_mem_same_ip += 1
+        argu['num_of_mem'] = num_mem_same_ip
         self.driver.delete_member(argu)
         self.driver.write_memory(argu)
 
