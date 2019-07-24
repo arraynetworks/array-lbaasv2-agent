@@ -515,48 +515,35 @@ class ADCDevice(object):
                 v_str = "<regex>%s" % value
             else:
                 v_str = "\<regex\>%s" % value
-            if key:
-                if is_driver_apv():
-                    v_key = "<regex>%s" % key
-                else:
-                    v_key = "\<regex\>%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_STARTS_WITH:
             if is_driver_apv():
                 v_str = "<regex>^%s" % value
             else:
                 v_str = "\<regex\>^%s" % value
-            if key:
-                if is_driver_apv():
-                    v_key = "<regex>^%s" % key
-                else:
-                    v_key = "\<regex\>^%s" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_ENDS_WITH:
             if is_driver_apv():
                 v_str = "<regex>%s$" % value
             else:
                 v_str = "\<regex\>%s$" % value
-            if key:
-                if is_driver_apv():
-                    v_key = "<regex>%s$" % key
-                else:
-                    v_key = "\<regex\>%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_EQUAL_TO:
             if is_driver_apv():
                 v_str = "<regex>^%s$" % value
             else:
                 v_str = "\<regex\>^%s$" % value
-            if key:
-                if is_driver_apv():
-                    v_key = "<regex>^%s$" % key
-                else:
-                    v_key = "\<regex\>^%s$" % key
         elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
             v_str = value
-            if key:
-                v_key = key
 
         if rule_type == lb_const.L7_RULE_TYPE_COOKIE:
-            v_str = "%s=%s" % (v_key, value)
+            if compare_type == lb_const.L7_RULE_COMPARE_TYPE_REGEX:
+                v_str = "<regex>%s=%s" % (key, value)
+            elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_STARTS_WITH:
+                v_str = "<regex>%s=%s.*" % (key, value)
+            elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_ENDS_WITH:
+                v_str = "<regex>%s=.*%s" % (key, value)
+            elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_CONTAINS:
+                v_str = "<regex>%s=.*%s.*" % (key, value)
+            elif compare_type == lb_const.L7_RULE_COMPARE_TYPE_EQUAL_TO:
+                v_str = "%s=%s" % (key, value)
         elif rule_type == lb_const.L7_RULE_TYPE_FILE_TYPE:
             if is_driver_apv():
                 v_str = "<regex>\.%s$" % value
