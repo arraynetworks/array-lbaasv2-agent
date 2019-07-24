@@ -165,9 +165,10 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_vapv')
 
-    def generate_tags(self, context):
+    def generate_ha_group_id(self, context, lb_id, subnet_id):
         cctxt = self.client.prepare()
-        return cctxt.call(context, 'generate_tags')
+        return cctxt.call(context, 'generate_ha_group_id',
+            lb_id=lb_id, subnet_id=subnet_id)
 
     def get_va_name_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()

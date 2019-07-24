@@ -155,8 +155,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return
 
         va_name = self.get_va_name(argu)
-        pri_port_id = None
-        sec_port_id = None
         lb_name = argu['vip_id']  #need verify
         if not self.net_seg_enable:
             self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_name)
@@ -170,7 +168,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self._create_segment(self.base_rest_urls, lb_name, va_name)
         self._create_segment_user(self.base_rest_urls, lb_name, va_name)
         # create vip
-        vlan_tag = 0
         internal_ip = None
         if len(self.hostnames) == 1:
             if self.net_seg_enable:
@@ -186,9 +183,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 argu['netmask'], argu['vlan_tag'], argu['gateway'],
                 va_name, lb_name, interface, internal_ip)
         else:
-            vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
-            if vlan_tag_map:
-                vlan_tag = vlan_tag_map['vlan_tag']
             if self.net_seg_enable:
                 self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
                 self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
@@ -202,9 +196,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 if idx == 0:
                     unit_item['priority'] = 100
                     unit_item['name'] = "unit_m"
-                    pri_port_id = interface_mapping[host]['port_id']
                 elif idx == 1:
-                    sec_port_id = interface_mapping[host]['port_id']
                     unit_item['name'] = "unit_s"
                     unit_item['priority'] = 90
                 base_rest_url = self.base_rest_urls[idx]
@@ -217,14 +209,17 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                    argu ['vlan_tag'], argu['gateway'], va_name, lb_name, interface, internal_ip)
                 unit_list.append(unit_item)
 
-            self.plugin_rpc.create_vapv(self.context, lb_name[:10], argu['vip_id'],
-                    argu['subnet_id'], in_use_lb=1, pri_port_id=pri_port_id,
-                    sec_port_id=sec_port_id, cluster_id=vlan_tag)
+            ha_group_id = 0
+            group_id_map = self.plugin_rpc.generate_ha_group_id(self.context,
+                lb_id=lb_name, subnet_id=argu['subnet_id'])
+            if group_id_map:
+                ha_group_id = group_id_map['group_id']
+            LOG.debug("Find the available group id: %d", ha_group_id)
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
                     argu['vip_address'], argu['vlan_tag'], lb_name, pool_name,
                     argu['pool_address'], va_name, self.context, argu['subnet_id'],
-                    interface)
+                    interface, ha_group_id)
         self.write_memory(argu, self.segment_enable)
 
 
@@ -246,20 +241,27 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 elif idx == 1:
                     unit_item['name'] = "unit_s"
                 unit_list.append(unit_item)
+            group_id = self.find_available_cluster_id(self.context, lb_name)
+            LOG.debug("Find the available group id: %d", group_id)
             for base_rest_url in self.base_rest_urls:
-                self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name, lb_name, self.context, argu['subnet_id'])
+                self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name,
+                    lb_name, self.context, argu['subnet_id'], group_id)
                 self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
             pool_port_name = argu['vip_id'] + "_pool"
+            LOG.debug("Delete port: %s" % pool_port_name)
             self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
             port_name = 'lb' + '-'+ argu['vip_id'] + "_0"
+            LOG.debug("Delete port: %s" % port_name)
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
             port_name = 'lb' + '-'+ argu['vip_id'] + "_1"
+            LOG.debug("Delete port: %s" % port_name)
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
             # Delete the apv from database
             self.plugin_rpc.delete_vapv(self.context, lb_name[:10])
 
         else:
             port_name = argu['vip_id'] + "_port"
+            LOG.debug("Delete port: %s" % port_name)
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
         # delete vip
         if not argu['vlan_tag']:
@@ -411,12 +413,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self.delete_port_for_subnet(argu['subnet_id'], member_id_filter=argu['member_id'])
 
     def configure_ha(self, base_rest_url, unit_list, vip_address,
-        vlan_tag, segment_name, pool_name, pool_address, va_name, context, vip_subnet_id, in_interface):
+        vlan_tag, segment_name, pool_name, pool_address, va_name,
+        context, vip_subnet_id, in_interface, group_id):
         bond = in_interface
         if vlan_tag:
             in_interface = "vlan." + vlan_tag
-        group_id = self.find_available_cluster_id(context, segment_name)
-        LOG.debug("find the available group id: %d", group_id)
         cmd_ha_group_id = ADCDevice.ha_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name, self.segment_enable)
 
@@ -445,9 +446,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name, self.segment_enable)
 
-    def clear_ha(self, base_rest_url, unit_list, vip_address, va_name, segment_name, context, vip_subnet_id):
-        group_id = self.find_available_cluster_id(context, segment_name)
-        LOG.debug("find the available group id: %d", group_id)
+    def clear_ha(self, base_rest_url, unit_list, vip_address, va_name,
+        segment_name, context, vip_subnet_id, group_id):
         cmd_delete_ha_group_id = ADCDevice.ha_no_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_delete_ha_group_id, va_name, self.segment_enable)
         # get ha decision by group id
