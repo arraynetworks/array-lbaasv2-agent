@@ -769,7 +769,6 @@ class ADCDevice(object):
         cmd = "no ha decision rule %s Group_Failover %s" % (vcondition, group_id)
         return cmd
 
-
     @staticmethod
     def write_memory():
         cmd = "write memory"
@@ -804,4 +803,3 @@ class ADCDevice(object):
     def synconfig_from_peer(peer_name):
         cmd = "synconfig from %s" % peer_name
         return cmd
-

@@ -803,7 +803,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         r = self.run_cli_extend(base_rest_url, cmd_show_ha_config,
             segment_enable=self.segment_enable)
         if not r or "ha off" in r.text:
-            LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
+            if not r:
+                LOG.debug("The HA is disabled on the host(%s)" % (self.hostnames[idx])
+            else :
+                LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
             return False
         return True
 
