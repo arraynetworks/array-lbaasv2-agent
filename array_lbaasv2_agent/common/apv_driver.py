@@ -40,7 +40,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                                                 plugin_rpc)
         self.hostnames = management_ip
         self.base_rest_urls = ["https://" + host + ":9997/rest/apv" for host in self.hostnames]
-        self.segment_user_passwd = "\"click1@ARRAY\""  #ToDo: get from configuration
+        self.segment_user_passwd = "click1@ARRAY"  #ToDo: get from configuration
         self.segment_enable = True
         self.net_seg_enable = cfg.CONF.arraynetworks.net_seg_enable
 
@@ -80,7 +80,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def _create_segment_user(self, base_rest_urls, segment_name, va_name):
         """ create segment user"""
 
-        segment_user_passwd = self.segment_user_passwd
+        segment_user_passwd = "\"%s\"" % self.segment_user_passwd
         level = "api"
         cmd_create_segment_user = ADCDevice.create_segment_user(va_name, segment_name, segment_user_passwd, level)
         if isinstance(base_rest_urls, list):
