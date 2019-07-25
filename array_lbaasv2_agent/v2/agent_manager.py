@@ -14,6 +14,7 @@
 from oslo_config import cfg
 from oslo_log import helpers as log_helpers
 import logging
+import traceback
 import oslo_messaging
 
 try:
@@ -94,19 +95,25 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
         recovery_lb_status.start(interval=60)
 
+        scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
+        scrub_dead_agents.start(interval=150)
+
 
     def scrub_dead_agents(self):
         try:
             LOG.info("Scrub dead agents...");
-            self.plugin_rpc.scrub_dead_agents(context)
+            self.plugin_rpc.scrub_dead_agents(self.context)
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to scrub dead agents: %s" % e.message)
 
 
     def update_lb_status(self):
         try:
+            LOG.info("Update member status ...");
             self.driver.driver.update_member_status(self.agent_host)
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to update member status: %s" % e.message)
 
     def _report_state(self):
@@ -118,6 +125,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         try:
             self.driver.driver.recovery_lbs_configuration()
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to recovery LBs configuration: %s" % e.message)
 
     @log_helpers.log_method_call

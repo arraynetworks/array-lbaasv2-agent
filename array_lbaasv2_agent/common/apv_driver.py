@@ -17,7 +17,6 @@ import time
 import requests
 import IPy
 import copy
-import netaddr
 from oslo_config import cfg
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 from array_lbaasv2_agent.common.adc_device import ADCDevice
@@ -613,21 +612,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         ret_vlan_tag = str(ret_vlan_tag)
         device_name = "vlan." + ret_vlan_tag
         interface_name = self.plugin_rpc.get_interface(self.context)
-        ip_address = subnet_port['fixed_ips'][0]['ip_address']
-
-        subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
-        member_network = netaddr.IPNetwork(subnet['cidr'])
-        netmask = str(member_network.netmask)
-        if member_network.version == 6:
-            idx = subnet['cidr'].find('/')
-            netmask = subnet['cidr'][idx+1:]
 
         cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
-        cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_vlan_device,
-                segment_enable=self.segment_enable)
-            self.run_cli_extend(base_rest_url, cmd_configure_ip,
                 segment_enable=self.segment_enable)
 
 
