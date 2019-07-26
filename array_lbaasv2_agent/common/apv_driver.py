@@ -477,6 +477,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def clear_ha(self, base_rest_url, unit_list, vip_address, va_name,
         segment_name, context, vip_subnet_id, group_id):
+        # Delete the ip pool
+        pool_name = "pool_" + segment_name
+        cmd_no_ip_pool = ADCDevice.no_ip_pool(pool_name)
+        self.run_cli_extend(base_rest_url, cmd_no_ip_pool, va_name)
+
+        # Delete the group id
         cmd_delete_ha_group_id = ADCDevice.ha_no_group_id(group_id)
         self.run_cli_extend(base_rest_url, cmd_delete_ha_group_id, va_name, self.segment_enable)
         # get ha decision by group id
