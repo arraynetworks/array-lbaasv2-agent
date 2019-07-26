@@ -895,14 +895,14 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
                             self.run_cli_extend(base_rest_url, cmd_configure_ip,
                                 segment_enable=self.segment_enable)
-                            cmd_write_memory = ADCDevice.write_memory()
-                            self.run_cli_extend(base_rest_url, cmd_write_memory,
-                                segment_enable=self.segment_enable)
                     else:
                         LOG.debug("Cannot to get port by name(%s)" % port_name)
                         continue
                     self._create_segment(base_rest_url, lb_id, lb_id[:15])
                     self._create_segment_user(base_rest_url, lb_id, lb_id[:15])
+                    cmd_write_memory = ADCDevice.write_memory()
+                    self.run_cli_extend(base_rest_url, cmd_write_memory,
+                        segment_enable=self.segment_enable)
             else:
                 LOG.debug("Need to implement")
         except Exception:
