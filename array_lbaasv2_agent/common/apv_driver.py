@@ -15,7 +15,7 @@ import json
 import six
 import time
 import requests
-import IPy
+import netaddr
 import copy
 import netaddr
 import traceback
@@ -94,12 +94,19 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         segment_user_passwd = "\"%s\"" % self.segment_user_passwd
         level = "api"
+        segment_user2_name = va_name[:8]
+        segment_user2_passwd = cfg.CONF.arraynetworks.array_api_password
+        user2_level = "config"
+
         cmd_create_segment_user = ADCDevice.create_segment_user(va_name, segment_name, segment_user_passwd, level)
+        cmd_create_segment_user2 = ADCDevice.create_segment_user(segment_user2_name, segment_name, segment_user2_passwd, user2_level)
         if isinstance(base_rest_urls, list):
             for base_rest_url in base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_create_segment_user, va_name, self.segment_enable)
+                self.run_cli_extend(base_rest_url, cmd_create_segment_user2, va_name, self.segment_enable)
         else:
             self.run_cli_extend(base_rest_urls, cmd_create_segment_user, va_name, self.segment_enable)
+            self.run_cli_extend(base_rest_urls, cmd_create_segment_user2, va_name, self.segment_enable)
 
 
     def _delete_segment_user(self, base_rest_urls, va_name):
@@ -345,8 +352,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         va_name = self.get_va_name(argu)
 
         member_address = argu['member_address']
-        ip_version = IPy.IP(member_address).version()
-        netmask = "255.255.255.255" if ip_version == 4 else "128"
+        ip_version = netaddr.valid_ipv4(member_address)
+        netmask = "255.255.255.255" if ip_version else "128"
         if not self.net_seg_enable:
             self.create_port_for_subnet(argu['subnet_id'], lb_id=argu['vip_id'])
 
@@ -423,8 +430,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             argu['member_id'], argu['member_port'])
         if self.net_seg_enable and argu['num_of_mem'] == 1:
             member_address = argu['member_address']
-            ip_version = IPy.IP(member_address).version()
-            netmask = "255.255.255.255" if ip_version == 4 else "128"
+            ip_version = netaddr.valid_ipv4(member_address)
+            netmask = "255.255.255.255" if ip_version else "128"
             internal_ip = self.plugin_rpc.get_internal_ip_by_lb(self.context, argu['vip_id'], member_address, use_for_nat=True)
             if not internal_ip:
                 LOG.error("Failed to find the internal ip by segment name(%s) and segment ip(%s)" % (argu['vip_id'], member_address))
@@ -707,6 +714,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         cmd_load_error_page = ADCDevice.load_http_error_page()
         self.run_cli_extend(base_rest_url, cmd_load_error_page, segment_enable=self.segment_enable)
+        cmd_support_enable = ADCDevice.support_enable()
+        self.run_cli_extend(base_rest_url, cmd_support_enable, segment_enable=self.segment_enable)
+        tcpidle_value = 3600
+        cmd_set_tcpidle = ADCDevice.set_tcpidle(tcpidle_value)
+        self.run_cli_extend(base_rest_url, cmd_set_tcpidle, segment_enable=self.segment_enable)
         #monitor vcondition
         bonds = self.plugin_rpc.get_all_interfaces(self.context)
         for bond in bonds:

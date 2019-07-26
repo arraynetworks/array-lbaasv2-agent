@@ -53,6 +53,16 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def support_enable():
+        cmd = "support 0.0.0.0 0"
+        return cmd
+
+    @staticmethod
+    def set_tcpidle(tcpidle_value):
+        cmd = "system tune tcpidle %d" % tcpidle_value
+        return cmd
+
+    @staticmethod
     def segment_enable():
         cmd = "segment enable"
         return cmd
