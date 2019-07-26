@@ -178,6 +178,10 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vapv_by_lb_id', vip_id=vip_id)
 
+    def get_loadbalancer_ids(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_loadbalancer_ids')
+
     def create_vapv(self, context, vapv_name, lb_id, subnet_id,
         in_use_lb, pri_port_id, sec_port_id, cluster_id):
         cctxt = self.client.prepare()

@@ -801,6 +801,16 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_vlan():
+        cmd = "show vlan"
+        return cmd
+
+    @staticmethod
+    def show_segment():
+        cmd = "show segment name"
+        return cmd
+
+    @staticmethod
     def synconfig_from_peer(peer_name):
         cmd = "synconfig from %s" % peer_name
         return cmd

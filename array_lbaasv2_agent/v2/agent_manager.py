@@ -93,7 +93,7 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         heartbeat_lb_status.start(interval=45)
 
         recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
-        recovery_lb_status.start(interval=60)
+        recovery_lb_status.start(interval=120)
 
         scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
         scrub_dead_agents.start(interval=150)
@@ -164,9 +164,11 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             self.driver.delete_loadbalancer(obj)
             self.plugin_rpc.lb_deleting_completion(context, obj)
         except ArrayADCException as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.exception('could not delete loadbalancer: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.lb_deleting_completion(context, obj)
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.exception('failed to delete loadbalancer: %s, %s', obj['id'], e.message)
             self.plugin_rpc.lb_deleting_completion(context, obj)
 

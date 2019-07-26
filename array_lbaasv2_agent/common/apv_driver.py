@@ -17,6 +17,8 @@ import time
 import requests
 import IPy
 import copy
+import netaddr
+import traceback
 from oslo_config import cfg
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
 from array_lbaasv2_agent.common.adc_device import ADCDevice
@@ -26,6 +28,17 @@ from neutron_lbaas.services.loadbalancer import constants as lb_const
 LOG = logging.getLogger(__name__)
 
 off_hosts = []
+
+def parse_vlan_result(result, key):
+    for line in result.split('\n'):
+        line=line.replace("\"", "")
+        line=line.replace("\\", "")
+        items=line.split()
+        if len(items) > 2:
+            itm2=str(items[2])
+            if itm2 == key:
+                return str(items[1])
+
 
 class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     """ The real implementation on host to push config to
@@ -242,10 +255,13 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 unit_list.append(unit_item)
             group_id = self.find_available_cluster_id(self.context, lb_name)
             LOG.debug("Find the available group id: %d", group_id)
-            for base_rest_url in self.base_rest_urls:
-                self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name,
-                    lb_name, self.context, argu['subnet_id'], group_id)
-                self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
+            for idx, base_rest_url in enumerate(self.base_rest_urls):
+                try:
+                    self.clear_ha(base_rest_url, unit_list, argu['vip_address'], va_name,
+                        lb_name, self.context, argu['subnet_id'], group_id)
+                except Exception:
+                    LOG.debug("Failed to clear ha in host(%s)", self.hostnames[idx])
+            self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
             pool_port_name = argu['vip_id'] + "_pool"
             LOG.debug("Delete port: %s" % pool_port_name)
             self.plugin_rpc.delete_port_by_name(self.context, pool_port_name)
@@ -272,6 +288,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             self._delete_vip(str(argu['vlan_tag']), va_name)
         else:
             self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
+        self.write_memory(segment_enable=self.segment_enable)
 
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface, internal_ip):
@@ -480,7 +497,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             if groupid == str(group_id):
                 cmd_no_show_ha_decision = ADCDevice.no_ha_decision_rule(vcondition_name, group_id)
                 self.run_cli_extend(base_rest_url, cmd_no_show_ha_decision, va_name, self.segment_enable)
-        self.write_memory(segment_enable=self.segment_enable)
 
 
     def run_cli_extend(self, base_rest_url, cmd, va_name=None, segment_enable=False,
@@ -550,23 +566,28 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def init_array_device(self):
         if len(self.hostnames) > 1:
             for idx, hostname in enumerate(self.hostnames):
-                ha_status = self.get_ha_status(idx)
-                if not ha_status:
-                    LOG.debug("The HA is off in the device(%s)" % hostname)
-                    self.init_one_array_device(idx)
-                else:
-                    LOG.debug("The HA is on in the device(%s), ignore to \
-                        init the device" % hostname)
+                try:
+                    ha_status = self.get_ha_status(idx)
+                    if not ha_status:
+                        LOG.debug("The HA is off in the device(%s)" % hostname)
+                        self.init_one_array_device(idx)
+                    else:
+                        LOG.debug("The HA is on in the device(%s), ignore to \
+                            init the device" % hostname)
+                except Exception:
+                    LOG.debug("Failed to get ha status...")
 
 
     def check_vlan_existed_in_device(self, vlan_tag):
         device_name = "vlan." + str(vlan_tag)
-        base_rest_url = self.base_rest_urls[0]
         cmd_show_interface = ADCDevice.show_interface(device_name)
-        r = self.run_cli_extend(base_rest_url, cmd_show_interface,
-            segment_enable=self.segment_enable)
-        if device_name in r.text:
-            return True
+        for base_rest_url in self.base_rest_urls:
+            r = self.run_cli_extend(base_rest_url, cmd_show_interface,
+                segment_enable=self.segment_enable)
+            if not r:
+                continue
+            if device_name in r.text:
+                return True
         return False
 
     def create_port_for_subnet(self, subnet_id, vlan_tag = None, lb_id = None):
@@ -647,10 +668,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             else:
                 LOG.debug("Cannot to get port by name(%s)" % port_name)
                 return True
-
-        if not self.check_vlan_existed_in_device(vlan_tag):
-            LOG.debug("The port wasn't created in device, ignore to delete port")
-            return True
 
         res_count = self.plugin_rpc.check_subnet_used(self.context,
             subnet_id, lb_id_filter, member_id_filter)
@@ -740,6 +757,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         auth_val = (lb_id[:15], self.segment_user_passwd)
         for idx, base_rest_url in enumerate(self.base_rest_urls):
             r = self.run_cli_extend(base_rest_url, cmd_get_status, va_name, auth_val=auth_val)
+            # TODO: the logical should be reviewed.
+            if not r:
+                continue
             status_str_index = r.text.index("status")
             health_check_index = r.text.index("Health Check")
             status_match_str = r.text[status_str_index + 8: health_check_index].strip().strip('-')
@@ -796,13 +816,104 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return False
         return True
 
+    def get_vlan_tag_by_port_name(self, port_name):
+        ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
+        if len(ret_ports) > 0:
+            port_id = ret_ports[0]['id']
+            ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
+            vlan_tag = ret_vlan['vlan_tag']
+            if vlan_tag == '-1':
+                LOG.debug("Cannot get the vlan_tag by port_id(%s)", port_id)
+                return False
+            else:
+                LOG.debug("Got the vlan_tag(%s) by port_id(%s)", vlan_tag, port_id)
+                return vlan_tag
+        LOG.debug("Cannot to get port by name(%s)" % port_name)
+        return -1
+
+
+    def check_segment_existed_in_device(self, base_rest_url, segment_name):
+        cmd_show_segment = ADCDevice.show_segment()
+        r = self.run_cli_extend(base_rest_url, cmd_show_segment,
+            segment_enable=self.segment_enable)
+        if not r:
+            return False
+        if segment_name not in r.text:
+            return False
+        return True
+
+    def parse_bond_name_from_device(self, idx, vlan_name):
+        base_rest_url = self.base_rest_urls[idx]
+        cmd_show_vlan = ADCDevice.show_vlan()
+        r = self.run_cli_extend(base_rest_url, cmd_show_vlan,
+            segment_enable=self.segment_enable)
+        if not r:
+            return None
+        else:
+            res_dict = json.loads(r.text)
+            return parse_vlan_result(res_dict['contents'], vlan_name)
+
+
+    def recovery_segment_configuration(self, idx):
+        try:
+            lb_ids = self.plugin_rpc.get_loadbalancer_ids(self.context)
+            if not lb_ids:
+                LOG.debug("No any loadbalancer in our current environment.")
+                return True
+            base_rest_url = self.base_rest_urls[idx]
+            if not self.net_seg_enable:
+                for lb_id, subnet_id in lb_ids:
+                    if self.check_segment_existed_in_device(base_rest_url, lb_id):
+                        LOG.debug("The segment(%s) has existed." % lb_id)
+                        continue
+                    port_name = 'lb' + '-'+ lb_id + "_" + str(idx)
+                    ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
+                    if len(ret_ports) > 0:
+                        port_id = ret_ports[0]['id']
+                        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
+                        vlan_tag = ret_vlan['vlan_tag']
+                        if vlan_tag == '-1':
+                            LOG.debug("Cannot get the vlan_tag by port_name(%s)", port_name)
+                            continue
+                        else:
+                            LOG.debug("Got the vlan_tag(%s) by port_name(%s)", vlan_tag, port_name)
+                            device_name = "vlan." + vlan_tag
+                            interface_name = self.parse_bond_name_from_device((1 - idx), device_name)
+                            if not interface_name:
+                                LOG.debug("Failed to parse to get bond name.")
+                                continue
+                            cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
+                            self.run_cli_extend(base_rest_url, cmd_vlan_device,
+                                segment_enable=self.segment_enable)
+                            ip_address = ret_ports[0]['fixed_ips'][0]['ip_address']
+                            subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
+                            vip_network = netaddr.IPNetwork(subnet['cidr'])
+                            netmask = str(vip_network.netmask)
+                            if vip_network.version == 6:
+                                idx = subnet['cidr'].find('/')
+                                netmask = subnet['cidr'][idx+1:]
+                            cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
+                            self.run_cli_extend(base_rest_url, cmd_configure_ip,
+                                segment_enable=self.segment_enable)
+                            cmd_write_memory = ADCDevice.write_memory()
+                            self.run_cli_extend(base_rest_url, cmd_write_memory,
+                                segment_enable=self.segment_enable)
+                    else:
+                        LOG.debug("Cannot to get port by name(%s)" % port_name)
+                        continue
+                    self._create_segment(base_rest_url, lb_id, lb_id[:15])
+                    self._create_segment_user(base_rest_url, lb_id, lb_id[:15])
+            else:
+                LOG.debug("Need to implement")
+        except Exception:
+            LOG.debug("failed to recovery segment configuration: %s" % traceback.format_exc())
 
     def get_ha_status(self, idx):
         base_rest_url = self.base_rest_urls[idx]
         cmd_show_ha_config = ADCDevice.show_ha_config()
         r = self.run_cli_extend(base_rest_url, cmd_show_ha_config,
-            segment_enable=self.segment_enable)
-        if not r or "ha off" in r.text:
+            segment_enable=self.segment_enable, connect_timeout=180, read_timeout=180)
+        if "ha off" in r.text:
             LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
             return False
         return True
@@ -845,6 +956,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         off_hosts(%s)" % (hostname, off_hosts))
                     active_idx = self.find_active_host(host_filter_idx=idx)
                     if active_idx != -1:
+                        LOG.debug("Recovery segment configuration ...")
+                        self.recovery_segment_configuration(1-active_idx)
                         LOG.debug("It synconfig from host(%d:%s)" % (active_idx,
                             self.hostnames[active_idx]))
                         self.synconfig_from(base_rest_url, idx)
@@ -852,16 +965,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         LOG.debug("Can't find any active host except the host(%s), so failed to \
                             synconfig", hostname)
                     off_hosts.remove(hostname)
-
-        LOG.debug("It will check the status of HA")
-        for idx, base_rest_url in enumerate(self.base_rest_urls):
-            ha_status = self.get_ha_status(idx)
-            if not ha_status:
-                LOG.debug("Will add the HA config in host(%s)" % self.hostnames[idx])
-                self.init_one_array_device(idx)
-                active_idx = self.find_active_host(host_filter_idx=idx)
-                if active_idx != -1:
-                    self.synconfig_from(base_rest_url, idx)
 
 
     def update_member_status(self, agent_host_name):
