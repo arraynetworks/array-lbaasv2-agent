@@ -421,7 +421,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         va_name = self.get_va_name(argu)
         cmd_apv_no_rs = ADCDevice.no_real_server(argu['protocol'],
             argu['member_id'], argu['member_port'])
-        if self.net_seg_enable and argu['num_of_mem'] > 1:
+        if self.net_seg_enable and argu['num_of_mem'] == 1:
             member_address = argu['member_address']
             ip_version = IPy.IP(member_address).version()
             netmask = "255.255.255.255" if ip_version == 4 else "128"
