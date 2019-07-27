@@ -301,16 +301,11 @@ class ArrayCommonAPIDriver(object):
         if len(self.hostnames) > 1:
             pool_name = "pool_" + argu['vip_id']
             cmd_slb_proxyip_group = ADCDevice.slb_proxyip_group(argu['pool_id'], pool_name)
-            cmd_ha_on = ADCDevice.ha_on()
 
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_create_group, va_name)
             if len(self.hostnames) > 1:
                 self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
-                self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
-                LOG.debug("In create_pool, waiting for enable ha")
-                time.sleep(10)
-                LOG.debug("In create_pool, done for waiting for enable ha")
 
         # create policy
         if argu['listener_id']:
