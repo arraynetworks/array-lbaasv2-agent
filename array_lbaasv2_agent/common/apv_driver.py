@@ -386,37 +386,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.write_memory(argu)
 
 
-    def create_pool(self, argu):
-        """ Create SLB group in lb-pool-create"""
-
-        if not argu:
-            LOG.error("In create_pool, it should not pass the None.")
-            return
-
-        va_name = self.get_va_name(argu)
-        cmd_apv_create_group = ADCDevice.create_group(argu['pool_id'],
-                                                      argu['lb_algorithm'],
-                                                      argu['session_persistence_type']
-                                                     )
-        cmd_slb_proxyip_group = None
-        if len(self.hostnames) > 1:
-            pool_name = "pool_" + argu['vip_id']
-            cmd_slb_proxyip_group = ADCDevice.slb_proxyip_group(argu['pool_id'], pool_name)
-
-        for base_rest_url in self.base_rest_urls:
-            self.run_cli_extend(base_rest_url, cmd_apv_create_group, va_name)
-            if len(self.hostnames) > 1:
-                self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
-                LOG.debug("In create_pool, waiting for enable ha")
-                time.sleep(10)
-                LOG.debug("In create_pool, done for waiting for enable ha")
-
-        # create policy
-        if argu['listener_id']:
-            self._create_policy(argu['pool_id'], argu['listener_id'],
-                                argu['session_persistence_type'],
-                                argu['lb_algorithm'], argu['cookie_name'], va_name)
-
 
     def delete_member(self, argu):
         """ Delete a member"""
