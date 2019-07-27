@@ -293,9 +293,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self._delete_segment_user(self.base_rest_urls, va_name)
         if self.net_seg_enable:
             self._delete_vip(str(argu['vlan_tag']), va_name)
+            self.write_memory(segment_enable=self.segment_enable)
         else:
+            self.write_memory(segment_enable=self.segment_enable)
             self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
-        self.write_memory(segment_enable=self.segment_enable)
 
 
     def _create_vip(self, base_rest_urls, vip_address, netmask, vlan_tag, gateway, va_name, lb_name, in_interface, internal_ip):
@@ -340,7 +341,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for base_rest_url in self.base_rest_urls:
             if vlan_tag:
                 self.run_cli_extend(base_rest_url, cmd_apv_no_vlan_device, va_name, self.segment_enable)
-        self.write_memory(segment_enable=self.segment_enable)
 
 
     def create_member(self, argu):
@@ -383,7 +383,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_create_real_server, va_name)
             self.run_cli_extend(base_rest_url, cmd_apv_add_rs_into_group, va_name)
-        self.write_memory(argu)
+        self.write_memory(segment_enable=self.segment_enable) #in order to save segment nat
 
 
 
@@ -408,11 +408,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             cmd_delete_segment_nat = ADCDevice.delete_segment_nat(argu['vip_id'], internal_ip, member_address, netmask)
             cmd_delete_route_static = ADCDevice.delete_route_static(member_address, netmask, argu['gateway'])
             for base_rest_url in self.base_rest_urls:
-                self.run_cli_extend(base_rest_url, cmd_delete_segment_nat, va_name, segment_enable=self.segment_enable)
                 self.run_cli_extend(base_rest_url, cmd_delete_route_static, va_name)
+                self.run_cli_extend(base_rest_url, cmd_delete_segment_nat, va_name, segment_enable=self.segment_enable)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
-        self.write_memory(argu)
+        self.write_memory(segment_enable=self.segment_enable) #in order to save delete segment nat
         if not self.net_seg_enable and argu['num_of_mem'] > 1:
             self.delete_port_for_subnet(argu['subnet_id'], member_id_filter=argu['member_id'])
 
