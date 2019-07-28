@@ -17,7 +17,6 @@ import time
 import requests
 import netaddr
 import copy
-import netaddr
 import traceback
 from oslo_config import cfg
 from array_lbaasv2_agent.common.array_driver import ArrayCommonAPIDriver
@@ -286,12 +285,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.debug("Delete port: %s" % port_name)
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
         # delete vip
-        if not argu['vlan_tag']:
-            LOG.error("Failed to got the vlan tag to delete loadbalancer")
-            return
         self._delete_segment(self.base_rest_urls, lb_name, va_name)
         self._delete_segment_user(self.base_rest_urls, va_name)
         if self.net_seg_enable:
+            if not argu['vlan_tag']:
+                LOG.error("Failed to got the vlan tag to delete loadbalancer")
+                return
             self._delete_vip(str(argu['vlan_tag']), va_name)
             self.write_memory(segment_enable=self.segment_enable)
         else:

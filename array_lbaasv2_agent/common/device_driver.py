@@ -326,7 +326,7 @@ class ArrayADCDriver(object):
         self.driver.write_memory(argu)
 
 
-    def create_pool(self, obj):
+    def create_pool(self, obj, updated=False):
         pool = obj
         sp_type = None
         ck_name = None
@@ -353,7 +353,8 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.create_pool(argu)
-        self.driver.write_memory(argu)
+        if not updated:
+            self.driver.write_memory(argu)
 
 
     def update_pool(self, obj, old_obj):
@@ -363,25 +364,33 @@ class ArrayADCDriver(object):
             if obj[changed] != old_obj[changed]:
                 need_recreate = True
 
+        argu = {}
         if need_recreate:
             LOG.debug("Need to recreate the pool....")
 
+            argu['pool_id'] = obj['id']
+            lb = obj['loadbalancer']
+            argu['vip_id'] = lb['stats']['loadbalancer_id']
             # firstly delete old group
-            self.delete_pool(old_obj)
+            self.delete_pool(old_obj, updated=True)
 
             # re-create group
-            self.create_pool(obj)
+            self.create_pool(obj, updated=True)
 
             # re-create members
             for member in obj['members']:
-                self.create_member(member)
+                argu['member_id'] = member['id']
+                argu['member_weight'] = member['weight']
+                self.driver.update_member(argu)
 
             # re-create healthmonitor
-            if obj['healthmonitor']:
-                # FIXME: should directly update the hm
-                self.create_health_monitor(obj['healthmonitor'])
+            hm = obj['healthmonitor']
+            if hm:
+                argu['hm_id'] = hm['id']
+                self.driver.update_health_monitor(argu)
+            self.driver.write_memory(argu)
 
-    def delete_pool(self, obj):
+    def delete_pool(self, obj, updated=False):
         pool = obj
 
         sp_type = None
@@ -408,7 +417,8 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.delete_pool(argu)
-        self.driver.write_memory(argu)
+        if not updated:
+            self.driver.write_memory(argu)
 
     def create_member(self, obj):
         member = obj

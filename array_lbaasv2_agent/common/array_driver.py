@@ -332,6 +332,20 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_apv_no_group, va_name)
 
 
+    def update_member(self, argu):
+        if not argu:
+            LOG.error("In create_member, it should not pass the None.")
+            return
+
+        va_name = self.get_va_name(argu)
+        cmd_add_rs_into_group = ADCDevice.add_rs_into_group(
+            argu['pool_id'], argu['member_id'], argu['member_weight'])
+
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_add_rs_into_group, va_name)
+
+
+
     def create_member(self, argu):
         """ create a member"""
 
@@ -370,6 +384,17 @@ class ArrayCommonAPIDriver(object):
 
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
+
+
+    def update_health_monitor(self, argu):
+        if not argu:
+            LOG.error("In create_health_monitor, it should not pass the None.")
+            return
+
+        va_name = self.get_va_name(argu)
+        cmd_attach_hm = ADCDevice.attach_hm_to_group(argu['pool_id'], argu['hm_id'])
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_attach_hm, va_name)
 
 
     def create_health_monitor(self, argu):
