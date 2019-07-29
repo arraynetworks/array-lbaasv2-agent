@@ -388,6 +388,14 @@ class ArrayADCDriver(object):
             if hm:
                 argu['hm_id'] = hm['id']
                 self.driver.update_health_monitor(argu)
+
+            # update L7 policy
+            if obj['l7_policies']:
+                for policy in obj['l7_policies']:
+                    self.create_l7policy(policy, updated=True)
+                    if policy['rules']:
+                        self.create_all_rules(policy)
+
             self.driver.write_memory(argu)
 
     def delete_pool(self, obj, updated=False):
