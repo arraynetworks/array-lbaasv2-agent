@@ -510,7 +510,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 LOG.debug("status_code: %d", r.status_code)
                 LOG.debug("status_contents: %s", r.text)
                 if r.status_code == 200:
-                    time.sleep(1)
                     return r
                 else:
                     time.sleep(conn_retry_interval)
