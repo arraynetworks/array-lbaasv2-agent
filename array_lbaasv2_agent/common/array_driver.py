@@ -724,7 +724,7 @@ class ArrayCommonAPIDriver(object):
 
     def create_ha_pool_port(self, argu):
         res_ports = {}
-        hostname = self.conf.arraynetworks.agent_host
+        hostname = cfg.CONF.arraynetworks.agent_host
         subnet_id = argu['subnet_id']
         port_name = 'ha_' + argu['vip_id'] + "_pool"
         ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
@@ -738,16 +738,14 @@ class ArrayCommonAPIDriver(object):
         self.plugin_rpc.delete_port_by_name(self.context, port_name)
 
     def create_instance_ports(self, argu, instance_name):
-        hostname = self.conf.arraynetworks.agent_host
+        hostname = cfg.CONF.arraynetworks.agent_host
         subnet_id = argu['subnet_id']
         res_ports = {}
-        if len(self.hosts) > 1:
-            cnt = 0
-            LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
-            for host in self.hosts:
+        if len(self.hostnames) > 1:
+            LOG.debug("self.hostnames(%s): len(%d)", self.hostnames, len(self.hostnames))
+            for idx, host in enumerate(self.hostnames):
                 interfaces = {}
-                port_name = instance_name + "_" + str(cnt)
-                cnt += 1
+                port_name = instance_name + "_" + str(idx)
                 port = self.plugin_rpc.create_port_on_subnet(self.context,
                     subnet_id, port_name, hostname, argu['vip_id'])
                 interfaces['address'] = port['fixed_ips'][0]['ip_address']
@@ -760,7 +758,7 @@ class ArrayCommonAPIDriver(object):
         return res_ports
 
     def delete_instance_ports(self, instance_name):
-        if len(self.hosts) > 1:
+        if len(self.hostnames) > 1:
             port_name = instance_name + "_0"
             LOG.debug("Delete port: %s" % port_name)
             self.plugin_rpc.delete_port_by_name(self.context, port_name)

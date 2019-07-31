@@ -88,7 +88,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         api_level = "api"
 
         segment_conf_user_name = segment_name[:10] + "_conf"
-        segment_conf_user_passwd = cfg.CONF.arraynetworks.array_api_password
+        segment_conf_user_passwd = "\"%s\"" % self.segment_user_passwd
         conf_level = "config"
 
         cmd_create_segment = ADCDevice.create_segment(segment_name)
@@ -211,15 +211,15 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         LOG.debug("Find the available group id: %d", ha_group_id)
 
         va_name = self.get_va_name(argu, segment_name=segment_name)
-        lb_name = argu['vip_id']  #need verify
         existed_segment = self.check_segment_existed_in_devices(segment_name)
 
-        if not self.net_seg_enable:
-            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_name)
-            self._create_segment_config(self.base_rest_urls, segment_name)
+        if self.net_seg_enable and existed_segment:
+            LOG.debug("No need to create segment configuration")
         else:
-            if not existed_segment:
-                self._create_segment_config(self.base_rest_urls, segment_name)
+            self._create_segment_config(self.base_rest_urls, segment_name)
+
+        if not self.net_seg_enable:
+            self.create_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], argu['vip_id'])
 
         # create vip
         internal_ip = None
@@ -232,7 +232,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         LOG.error("Failed to get available internal ip address for create loadbalancer")
                         return
                     self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
-                    self._segment_interface(self.base_rest_urls, argu['vlan_tag'], lb_name, va_name, interface)
+                    self._segment_interface(self.base_rest_urls, argu['vlan_tag'], segment_name, va_name, interface)
                     self._create_vip(self.base_rest_urls, argu['ip_address'],argu['netmask'],
                         argu['vlan_tag'], argu['gateway'], va_name, internal_ip)
             else:
@@ -244,7 +244,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     self._create_vlan_device(self.base_rest_urls,
                         argu['vlan_tag'], va_name, interface)
                     self._segment_interface(self.base_rest_urls,
-                        argu['vlan_tag'], lb_name, va_name, interface)
+                        argu['vlan_tag'], segment_name, va_name, interface)
             unit_list = []
             pool_name = "pool_" + argu['vip_id']
 
@@ -278,7 +278,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 unit_list.append(unit_item)
             for base_rest_url in self.base_rest_urls:
                 self.configure_ha(base_rest_url, unit_list,
-                    argu['vip_address'], argu['vlan_tag'], lb_name, pool_name,
+                    argu['vip_address'], argu['vlan_tag'], segment_name, pool_name,
                     res_lb_port['pool_address'], va_name, self.context, argu['subnet_id'],
                     interface, ha_group_id)
         self.write_memory(argu, self.segment_enable)
@@ -318,19 +318,23 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     LOG.debug("Failed to clear ha in host(%s)", self.hostnames[idx])
             self.delete_ha_pool_port(argu)
 
-        LOG.debug("Will delete segment")
-        self._delete_segment_config(self.base_rest_urls, segment_name)
 
         if self.net_seg_enable:
-            existed_segment = self.check_segment_existed_in_devices(segment_name)
-            if not existed_segment:
+            ret_segment_used = self.plugin_rpc.get_segment_used(self.context,
+                segment_name, lb_id_filter=lb_name)
+            segment_used = ret_segment_used['count']
+            LOG.debug("segment_used is %d" % segment_used)
+            if segment_used == 0:
+                LOG.debug("Will delete segment(%s)" % segment_name)
+                self._delete_segment_config(self.base_rest_urls, segment_name)
                 LOG.debug("Will delete the ports created by segment")
                 self.delete_instance_ports(segment_name)
-            self._delete_vip(str(argu['vlan_tag']), va_name)
+                self._delete_vip(str(argu['vlan_tag']), va_name)
         else:
             LOG.debug("Will delete the ports created by segment")
             self.delete_instance_ports(segment_name)
             self.delete_port_for_subnet(argu['subnet_id'], argu['vlan_tag'], lb_id_filter=lb_name)
+        self.plugin_rpc.delete_vapv(self.context, lb_name[:10])
         self.write_memory(segment_enable=self.segment_enable)
 
 
@@ -777,7 +781,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         status_dic = {}
         host_dic = {}
         cmd_get_status = ADCDevice.get_health_status()
-        auth_val = (lb_id[:15], self.segment_user_passwd)
+        auth_val = (va_name, self.segment_user_passwd)
         for idx, base_rest_url in enumerate(self.base_rest_urls):
             r = self.run_cli_extend(base_rest_url, cmd_get_status, va_name, auth_val=auth_val)
             # TODO: the logical should be reviewed.
