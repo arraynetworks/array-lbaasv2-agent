@@ -721,3 +721,55 @@ class ArrayCommonAPIDriver(object):
         except Exception:
             return False
         return True
+
+    def create_ha_pool_port(self, argu):
+        res_ports = {}
+        hostname = self.conf.arraynetworks.agent_host
+        subnet_id = argu['subnet_id']
+        port_name = 'ha_' + argu['vip_id'] + "_pool"
+        ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
+            subnet_id, port_name, hostname, argu['vip_id'])
+        res_ports['pool_address'] = ip_pool_port['fixed_ips'][0]['ip_address']
+        return res_ports
+
+    def delete_ha_pool_port(self, argu):
+        port_name = 'ha_' + argu['vip_id'] + "_pool"
+        LOG.debug("Delete port: %s" % port_name)
+        self.plugin_rpc.delete_port_by_name(self.context, port_name)
+
+    def create_instance_ports(self, argu, instance_name):
+        hostname = self.conf.arraynetworks.agent_host
+        subnet_id = argu['subnet_id']
+        res_ports = {}
+        if len(self.hosts) > 1:
+            cnt = 0
+            LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
+            for host in self.hosts:
+                interfaces = {}
+                port_name = instance_name + "_" + str(cnt)
+                cnt += 1
+                port = self.plugin_rpc.create_port_on_subnet(self.context,
+                    subnet_id, port_name, hostname, argu['vip_id'])
+                interfaces['address'] = port['fixed_ips'][0]['ip_address']
+                res_ports[host] = interfaces
+        else:
+            port_name = instance_name + "_port"
+            ip_port = self.plugin_rpc.create_port_on_subnet(self.context,
+                subnet_id, port_name, hostname, argu['vip_id'])
+            res_ports['ip_address'] = ip_port['fixed_ips'][0]['ip_address']
+        return res_ports
+
+    def delete_instance_ports(self, instance_name):
+        if len(self.hosts) > 1:
+            port_name = instance_name + "_0"
+            LOG.debug("Delete port: %s" % port_name)
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+            port_name = instance_name + "_1"
+            LOG.debug("Delete port: %s" % port_name)
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+        else:
+            port_name = instance_name + "_port"
+            LOG.debug("Delete port: %s" % port_name)
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+        return
+

@@ -165,10 +165,16 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_vapv')
 
-    def generate_ha_group_id(self, context, lb_id, subnet_id):
+    def generate_ha_group_id(self, context, lb_id, subnet_id,
+        tenant_id, segment_name):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_ha_group_id',
-            lb_id=lb_id, subnet_id=subnet_id)
+            lb_id=lb_id, subnet_id=subnet_id,
+            tenant_id=tenant_id, segment_name=segment_name)
+
+    def get_segment_name_by_lb_id(self, context, vip_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_segment_name_by_lb_id', vip_id=vip_id)
 
     def get_va_name_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()

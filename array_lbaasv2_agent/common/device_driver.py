@@ -172,33 +172,6 @@ class ArrayADCDriver(object):
                 if network_type:
                     argu['network_type'] = network_type
 
-        interface_mapping = {}
-        hostname = self.conf.arraynetworks.agent_host
-        if len(self.hosts) > 1:
-            cnt = 0
-            LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
-
-            port_name = lb['id'] + "_pool"
-            ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
-                subnet_id, port_name, hostname, lb['id'])
-            argu['pool_address'] = ip_pool_port['fixed_ips'][0]['ip_address']
-            for host in self.hosts:
-                interfaces = {}
-                port_name = 'lb' + '-'+ lb['id'] + "_" + str(cnt)
-                cnt += 1
-                port = self.plugin_rpc.create_port_on_subnet(self.context,
-                    subnet_id, port_name, hostname, lb['id'])
-                interfaces['address'] = port['fixed_ips'][0]['ip_address']
-                interfaces['port_id'] = port['id']
-                interface_mapping[host] = interfaces
-        else:
-            port_name = lb['id'] + "_port"
-            ip_port = self.plugin_rpc.create_port_on_subnet(self.context,
-                subnet_id, port_name, hostname, lb['id'])
-            argu['ip_address'] = ip_port['fixed_ips'][0]['ip_address']
-
-        argu['interface_mapping'] = interface_mapping
-
         argu['gateway'] = subnet['gateway_ip']
         argu['subnet_id'] = lb['vip_subnet_id']
         argu['tenant_id'] = lb['tenant_id']
@@ -532,6 +505,7 @@ class ArrayADCDriver(object):
         argu = {}
         policy = rule['policy']
 
+        argu['tenant_id'] = rule['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
         LOG.debug("Delete all rules from policy in create_l7_rule")
         self.delete_all_rules(policy)
@@ -552,6 +526,7 @@ class ArrayADCDriver(object):
             LOG.debug("It doesn't need do any thing(update_l7_rule)")
             return
 
+        argu['tenant_id'] = rule['tenant_id']
         if rule['l7policy_id'] != old_rule['l7policy_id']:
             policy_changed = True
 
@@ -576,6 +551,7 @@ class ArrayADCDriver(object):
         argu = {}
         policy = rule['policy']
 
+        argu['tenant_id'] = rule['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
         LOG.debug("Delete all rules from policy in delete_l7_rule")
         self.delete_all_rules(policy)
@@ -588,6 +564,7 @@ class ArrayADCDriver(object):
         argu = {}
 
         listener = policy['listener']
+        argu['tenant_id'] = policy['tenant_id']
         argu['action'] = policy['action']
         argu['id'] = policy['id']
         argu['listener_id'] = policy['listener_id']
@@ -623,6 +600,7 @@ class ArrayADCDriver(object):
             return
 
         argu = {}
+        argu['tenant_id'] = policy['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
         self.delete_l7policy(old_policy, updated=True)
         self.create_l7policy(policy, updated=True)
@@ -634,6 +612,7 @@ class ArrayADCDriver(object):
     def delete_l7policy(self, policy, updated=False):
         argu = {}
         listener = policy['listener']
+        argu['tenant_id'] = policy['tenant_id']
         argu['action'] = policy['action']
         argu['id'] = policy['id']
         argu['listener_id'] = policy['listener_id']
@@ -663,6 +642,7 @@ class ArrayADCDriver(object):
         listener = policy['listener']
 
         argu['vip_id'] = listener['loadbalancer_id']
+        argu['tenant_id'] = policy['tenant_id']
         for rule in rules:
             argu['rule_type'] = rule['type']
             argu['rule_id'] = rule['id']
@@ -686,6 +666,7 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = listener['loadbalancer_id']
         argu['vs_id'] = policy['listener_id']
+        argu['tenant_id'] = policy['tenant_id']
         argu['action'] = policy['action']
         argu['redirect_url'] = policy['redirect_url']
         if policy['redirect_pool']:
