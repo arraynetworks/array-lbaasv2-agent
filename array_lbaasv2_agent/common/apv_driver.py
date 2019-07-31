@@ -986,6 +986,13 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.debug("It can't build the HA environment.")
             return True
 
+        active_agents = self.plugin_rpc.get_active_agents(self.context)
+        master_agent = active_agents[0]
+        agent_host = cfg.CONF.arraynetworks.agent_host
+        if master_agent['host'] != agent_host:
+            LOG.debug("master_host(%s) is not current agent_host(%s), exiting" % (master_agent['host'], agent_host))
+            return True
+
         global off_hosts
         LOG.debug("It will check the status of Host, current off hosts is : %s" % off_hosts)
         for idx, base_rest_url in enumerate(self.base_rest_urls):
