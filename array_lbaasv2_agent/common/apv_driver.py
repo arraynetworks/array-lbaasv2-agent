@@ -760,6 +760,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         cmd_ha_ssf_peer = ADCDevice.ha_ssf_peer(peer_ip_address)
         cmd_ha_ssf_on = ADCDevice.ha_ssf_on()
         cmd_ha_link_ffo_on = ADCDevice.ha_link_ffo_on()
+        cmd_ha_synconfig_bootup_on = ADCDevice.ha_synconfig_bootup_on()
         cmd_ha_on = ADCDevice.ha_on()
         cmd_apv_write_memory = ADCDevice.write_memory()
         if self.net_seg_enable:
@@ -771,6 +772,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_peer, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_link_ffo_on, segment_enable=self.segment_enable)
+        self.run_cli_extend(base_rest_url, cmd_ha_synconfig_bootup_on, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_on, segment_enable=self.segment_enable)
         time.sleep(10)
         self.run_cli_extend(base_rest_url, cmd_segment, segment_enable=self.segment_enable)
@@ -1004,7 +1006,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         self.recovery_segment_configuration(1-active_idx)
                         LOG.debug("It synconfig from host(%d:%s)" % (active_idx,
                             self.hostnames[active_idx]))
-                        self.synconfig_from(base_rest_url, idx)
                     else:
                         LOG.debug("Can't find any active host except the host(%s), so failed to \
                             synconfig", hostname)
