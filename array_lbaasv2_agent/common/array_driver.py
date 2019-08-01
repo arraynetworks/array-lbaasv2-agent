@@ -21,6 +21,7 @@ from oslo_config import cfg
 
 from neutron_lbaas.services.loadbalancer import constants as lb_const
 from array_lbaasv2_agent.common.adc_device import ADCDevice
+from array_lbaasv2_agent.common.adc_device import is_driver_apv
 from array_lbaasv2_agent.common import exceptions as driver_except
 
 LOG = logging.getLogger(__name__)
@@ -83,19 +84,19 @@ class ArrayCommonAPIDriver(object):
                     LOG.debug("_create_vip: Exception is raised in idx(%d)" % idx)
                     exception_lb = idx + 10
                 if idx == 0:
-                    if cfg.CONF.arraynetworks.bonding:
+                    if cfg.CONF.arraynetworks.avx_ha_heartbeat_enable:
                         ip_address = "2.2.2.2"
                     unit_item['priority'] = 100
                     unit_item['name'] = argu['vip_id'][:6] + '_p'
                     pri_port_id = interface_mapping[host]['port_id']
                 elif idx == 1:
-                    if cfg.CONF.arraynetworks.bonding:
+                    if cfg.CONF.arraynetworks.avx_ha_heartbeat_enable:
                         ip_address = "2.2.2.3"
                     sec_port_id = interface_mapping[host]['port_id']
                     unit_item['name'] = argu['vip_id'][:6] + '_s'
                     unit_item['priority'] = 90
                 unit_item['ip_address'] = ip_address
-                if cfg.CONF.arraynetworks.bonding:
+                if cfg.CONF.arraynetworks.avx_ha_heartbeat_enable:
                     vlan_tag_map = self.plugin_rpc.generate_tags(self.context)
                     if vlan_tag_map:
                         vlan_tag = vlan_tag_map['vlan_tag']
@@ -108,7 +109,7 @@ class ArrayCommonAPIDriver(object):
                 unit_list.append(unit_item)
             for idx, base_rest_url in enumerate(self.base_rest_urls):
                 peer_ip_address = None
-                if not cfg.CONF.arraynetworks.bonding:
+                if not cfg.CONF.arraynetworks.avx_ha_heartbeat_enable:
                     if idx == 0:
                         peer_host = self.hostnames[1]
                     else:
@@ -363,9 +364,10 @@ class ArrayCommonAPIDriver(object):
             if len(self.hostnames) > 1:
                 self.run_cli_extend(base_rest_url, cmd_slb_proxyip_group, va_name)
                 self.run_cli_extend(base_rest_url, cmd_ha_on, va_name)
-                LOG.debug("In create_pool, waiting for enable ha")
-                time.sleep(10)
-                LOG.debug("In create_pool, done for waiting for enable ha")
+                if not is_driver_apv():
+                    LOG.debug("In create_pool, waiting for enable ha")
+                    time.sleep(10)
+                    LOG.debug("In create_pool, done for waiting for enable ha")
 
         # create policy
         if argu['listener_id']:
@@ -390,6 +392,19 @@ class ArrayCommonAPIDriver(object):
         cmd_apv_no_group = ADCDevice.no_group(argu['pool_id'])
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_group, va_name)
+
+
+    def update_member(self, argu):
+        if not argu:
+            LOG.error("In create_member, it should not pass the None.")
+            return
+
+        va_name = self.get_va_name(argu)
+        cmd_add_rs_into_group = ADCDevice.add_rs_into_group(
+            argu['pool_id'], argu['member_id'], argu['member_weight'])
+
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_add_rs_into_group, va_name)
 
 
     def create_member(self, argu):
@@ -430,6 +445,17 @@ class ArrayCommonAPIDriver(object):
 
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_apv_no_rs, va_name)
+
+
+    def update_health_monitor(self, argu):
+        if not argu:
+            LOG.error("In create_health_monitor, it should not pass the None.")
+            return
+
+        va_name = self.get_va_name(argu)
+        cmd_attach_hm = ADCDevice.attach_hm_to_group(argu['pool_id'], argu['hm_id'])
+        for base_rest_url in self.base_rest_urls:
+            self.run_cli_extend(base_rest_url, cmd_attach_hm, va_name)
 
 
     def create_health_monitor(self, argu):
@@ -787,4 +813,53 @@ class ArrayCommonAPIDriver(object):
         except Exception:
             return False
         return True
+
+    def create_ha_pool_port(self, argu):
+        res_ports = {}
+        hostname = cfg.CONF.arraynetworks.agent_host
+        subnet_id = argu['subnet_id']
+        port_name = 'ha_' + argu['vip_id'] + "_pool"
+        ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
+            subnet_id, port_name, hostname, argu['vip_id'])
+        res_ports['pool_address'] = ip_pool_port['fixed_ips'][0]['ip_address']
+        return res_ports
+
+    def delete_ha_pool_port(self, argu):
+        port_name = 'ha_' + argu['vip_id'] + "_pool"
+        LOG.debug("Delete port: %s" % port_name)
+        self.plugin_rpc.delete_port_by_name(self.context, port_name)
+
+    def create_instance_ports(self, argu, instance_name):
+        hostname = cfg.CONF.arraynetworks.agent_host
+        subnet_id = argu['subnet_id']
+        res_ports = {}
+        if len(self.hostnames) > 1:
+            LOG.debug("self.hostnames(%s): len(%d)", self.hostnames, len(self.hostnames))
+            for idx, host in enumerate(self.hostnames):
+                interfaces = {}
+                port_name = instance_name + "_" + str(idx)
+                port = self.plugin_rpc.create_port_on_subnet(self.context,
+                    subnet_id, port_name, hostname, argu['vip_id'])
+                interfaces['address'] = port['fixed_ips'][0]['ip_address']
+                res_ports[host] = interfaces
+        else:
+            port_name = instance_name + "_port"
+            ip_port = self.plugin_rpc.create_port_on_subnet(self.context,
+                subnet_id, port_name, hostname, argu['vip_id'])
+            res_ports['ip_address'] = ip_port['fixed_ips'][0]['ip_address']
+        return res_ports
+
+    def delete_instance_ports(self, instance_name):
+        if len(self.hostnames) > 1:
+            port_name = instance_name + "_0"
+            LOG.debug("Delete port: %s" % port_name)
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+            port_name = instance_name + "_1"
+            LOG.debug("Delete port: %s" % port_name)
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+        else:
+            port_name = instance_name + "_port"
+            LOG.debug("Delete port: %s" % port_name)
+            self.plugin_rpc.delete_port_by_name(self.context, port_name)
+        return
 
