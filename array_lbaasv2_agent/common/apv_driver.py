@@ -88,7 +88,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         api_level = "api"
 
         segment_conf_user_name = segment_name[:10] + "_conf"
-        segment_conf_user_passwd = "\"%s\"" % self.segment_user_passwd
+        segment_config_password = cfg.CONF.arraynetworks.segment_config_password
+        segment_conf_user_passwd = "\"%s\"" % segment_config_password
         conf_level = "config"
 
         cmd_create_segment = ADCDevice.create_segment(segment_name)
@@ -535,7 +536,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         LOG.debug("Run the URL: --%s--", url)
         LOG.debug("Run the CLI: --%s--", cmd)
         conn_max_retries = 1
-        conn_retry_interval = 2
         auth_value = self.get_auth()
         if auth_val:
             auth_value = auth_val
@@ -553,15 +553,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 LOG.debug("status_contents: %s", r.text)
                 if r.status_code == 200:
                     return r
-                else:
-                    time.sleep(conn_retry_interval)
             except (requests.ConnectionError, requests.Timeout) as e:
                 exception = e
                 LOG.warning("Could not connect to instance. Retrying.")
-                time.sleep(conn_retry_interval)
 
         LOG.error("Connection retries (currently set to %(max_retries)s) "
-                  "exhausted.  The vapv is unavailable. Reason: "
+                  "exhausted.  The apv is unavailable. Reason: "
                   "%(exception)s",
                   {'max_retries': conn_max_retries,
                    'exception': exception})
@@ -1007,6 +1004,12 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 if hostname in off_hosts:
                     LOG.debug("Host(%s) is currently ON, but it is still on the \
                         off_hosts(%s)" % (hostname, off_hosts))
+                    status = self.get_ha_domain_status(idx)
+                    if not status:
+                        LOG.debug("The current status is NOT UP, so ignore to sync LB configuration.")
+                        continue
+                    else:
+                        LOG.debug("The current status is UP, will sync LB configuration.")
                     active_idx = self.find_active_host(host_filter_idx=idx)
                     if active_idx != -1:
                         LOG.debug("Recovery segment configuration ...")
@@ -1034,5 +1037,24 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     LOG.debug("--------will update_member_status -------")
                     self.plugin_rpc.update_member_status(self.context,
                         member_id, new_member_status)
+
+    def get_ha_domain_status(self, idx):
+        base_rest_url = self.base_rest_urls[idx]
+        unit_name = "unit_m"
+        if idx == 1:
+            unit_name = "unit_s"
+        cmd_show_ha_status_domain = ADCDevice.show_ha_status_domain()
+        try:
+            r = self.run_cli_extend(base_rest_url, cmd_show_ha_status_domain,
+                segment_enable=self.segment_enable)
+        except Exception:
+            return False
+        if r:
+            res_dict = json.loads(r.text)
+            result = res_dict['contents']
+            for line in result.split('\n'):
+                if (unit_name in line) and ('UP' in line):
+                    return True
+        return False
 
 

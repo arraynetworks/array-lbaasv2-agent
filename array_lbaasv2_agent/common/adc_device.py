@@ -801,6 +801,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_ha_status_domain():
+        cmd = "show ha status domain"
+        return cmd
+
+    @staticmethod
     def show_ha_config():
         cmd = "show ha config"
         return cmd

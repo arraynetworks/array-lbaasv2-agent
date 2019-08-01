@@ -53,6 +53,11 @@ OPTS = [
         default='click1',
         help=('APV Restful API password')
     ),
+    cfg.StrOpt(
+        'segment_config_password',
+        default='Array123',
+        help=('APV Restful API password')
+    ),
     cfg.BoolOpt(
         'bonding',
         default=False,
