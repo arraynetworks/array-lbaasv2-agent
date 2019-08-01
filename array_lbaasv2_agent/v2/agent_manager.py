@@ -95,6 +95,9 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
         recovery_lb_status.start(interval=120)
 
+        delete_redundant_segment = loopingcall.FixedIntervalLoopingCall(self.delete_redundant_segment_configuration)
+        delete_redundant_segment.start(interval=120)
+
         scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
         scrub_dead_agents.start(interval=150)
 

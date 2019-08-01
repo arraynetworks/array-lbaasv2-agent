@@ -695,6 +695,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ha_ssf_timeout(timeout):
+        cmd = "ha ssf timeout %d" % timeout
+        return cmd
+
+    @staticmethod
     def ha_group_fip(group_id, ip_address, port_name):
         cmd = "ha group fip %d %s %s" % (group_id, ip_address, port_name)
         return cmd
@@ -779,10 +784,17 @@ class ADCDevice(object):
         cmd = "no ha decision rule %s Group_Failover %s" % (vcondition, group_id)
         return cmd
 
-
     @staticmethod
     def write_memory():
         cmd = "write memory"
+        return cmd
+
+    @staticmethod
+    def write_segment_memory(segment_name):
+        if segment_name:
+            cmd = "write segment memory %s" % segment_name
+        else:
+            cmd = "write segment memory"
         return cmd
 
     @staticmethod
@@ -826,6 +838,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_segment_interface(segment_name):
+        cmd = "show segment interface %s" % segment_name
+        return cmd
+
+    @staticmethod
     def ha_synconfig_bootup_on():
         cmd = "ha synconfig bootup on"
         return cmd
@@ -835,3 +852,7 @@ class ADCDevice(object):
         cmd = "synconfig from %s" % peer_name
         return cmd
 
+    @staticmethod
+    def synconfig_from_segment(peer_name, segment_name):
+        cmd = "synconfig from %s %s" % (peer_name, segment_name)
+        return cmd
