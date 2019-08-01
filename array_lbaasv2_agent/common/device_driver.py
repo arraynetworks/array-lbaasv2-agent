@@ -66,6 +66,11 @@ OPTS = [
         'array_device_driver',
         default=('array_lbaasv2_agent.common.avx_driver.ArrayAVXAPIDriver'),
         help=('The driver used to provision ADC product')
+    ),
+    cfg.BoolOpt(
+        'net_seg_enable',
+        default=False,
+        help=('Enable network segment function')
     )
 ]
 
@@ -167,33 +172,6 @@ class ArrayADCDriver(object):
                 if network_type:
                     argu['network_type'] = network_type
 
-        interface_mapping = {}
-        hostname = self.conf.arraynetworks.agent_host
-        if len(self.hosts) > 1:
-            cnt = 0
-            LOG.debug("self.hosts(%s): len(%d)", self.hosts, len(self.hosts))
-
-            port_name = lb['id'] + "_pool"
-            ip_pool_port = self.plugin_rpc.create_port_on_subnet(self.context,
-                subnet_id, port_name, hostname, lb['id'])
-            argu['pool_address'] = ip_pool_port['fixed_ips'][0]['ip_address']
-            for host in self.hosts:
-                interfaces = {}
-                port_name = 'lb' + '-'+ lb['id'] + "_" + str(cnt)
-                cnt += 1
-                port = self.plugin_rpc.create_port_on_subnet(self.context,
-                    subnet_id, port_name, hostname, lb['id'])
-                interfaces['address'] = port['fixed_ips'][0]['ip_address']
-                interfaces['port_id'] = port['id']
-                interface_mapping[host] = interfaces
-        else:
-            port_name = lb['id'] + "_port"
-            ip_port = self.plugin_rpc.create_port_on_subnet(self.context,
-                subnet_id, port_name, hostname, lb['id'])
-            argu['ip_address'] = ip_port['fixed_ips'][0]['ip_address']
-
-        argu['interface_mapping'] = interface_mapping
-
         argu['gateway'] = subnet['gateway_ip']
         argu['subnet_id'] = lb['vip_subnet_id']
         argu['tenant_id'] = lb['tenant_id']
@@ -204,7 +182,6 @@ class ArrayADCDriver(object):
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
         self.driver.create_loadbalancer(argu)
-        self.driver.write_memory(argu)
 
 
     def update_loadbalancer(self, obj, old_obj):
@@ -229,6 +206,7 @@ class ArrayADCDriver(object):
         argu['tenant_id'] = lb['tenant_id']
         argu['vip_id'] = lb['id']
         argu['vip_address'] = lb['vip_address']
+        argu['subnet_id'] = lb['vip_subnet_id']
 
         if not argu['vlan_tag']:
             segment_id = None
@@ -245,7 +223,6 @@ class ArrayADCDriver(object):
                     argu['network_type'] = network_type
 
         self.driver.delete_loadbalancer(argu)
-        self.driver.write_memory(argu)
 
 
     def get_stats(self, instance):
@@ -322,7 +299,7 @@ class ArrayADCDriver(object):
         self.driver.write_memory(argu)
 
 
-    def create_pool(self, obj):
+    def create_pool(self, obj, updated=False):
         pool = obj
         sp_type = None
         ck_name = None
@@ -349,7 +326,8 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.create_pool(argu)
-        self.driver.write_memory(argu)
+        if not updated:
+            self.driver.write_memory(argu)
 
 
     def update_pool(self, obj, old_obj):
@@ -359,25 +337,41 @@ class ArrayADCDriver(object):
             if obj[changed] != old_obj[changed]:
                 need_recreate = True
 
+        argu = {}
         if need_recreate:
             LOG.debug("Need to recreate the pool....")
 
+            argu['pool_id'] = obj['id']
+            lb = obj['loadbalancer']
+            argu['vip_id'] = lb['stats']['loadbalancer_id']
             # firstly delete old group
-            self.delete_pool(old_obj)
+            self.delete_pool(old_obj, updated=True)
 
             # re-create group
-            self.create_pool(obj)
+            self.create_pool(obj, updated=True)
 
             # re-create members
             for member in obj['members']:
-                self.create_member(member)
+                argu['member_id'] = member['id']
+                argu['member_weight'] = member['weight']
+                self.driver.update_member(argu)
 
             # re-create healthmonitor
-            if obj['healthmonitor']:
-                # FIXME: should directly update the hm
-                self.create_health_monitor(obj['healthmonitor'])
+            hm = obj['healthmonitor']
+            if hm:
+                argu['hm_id'] = hm['id']
+                self.driver.update_health_monitor(argu)
 
-    def delete_pool(self, obj):
+            # update L7 policy
+            if obj['l7_policies']:
+                for policy in obj['l7_policies']:
+                    self.create_l7policy(policy, updated=True)
+                    if policy['rules']:
+                        self.create_all_rules(policy)
+
+            self.driver.write_memory(argu)
+
+    def delete_pool(self, obj, updated=False):
         pool = obj
 
         sp_type = None
@@ -404,7 +398,8 @@ class ArrayADCDriver(object):
             argu['listener_id'] = None
 
         self.driver.delete_pool(argu)
-        self.driver.write_memory(argu)
+        if not updated:
+            self.driver.write_memory(argu)
 
     def create_member(self, obj):
         member = obj
@@ -420,6 +415,16 @@ class ArrayADCDriver(object):
         argu['member_weight'] = member['weight']
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
+        argu['subnet_id'] = member['subnet_id']
+
+        subnet = self.plugin_rpc.get_subnet(self.context, argu['subnet_id'])
+        member_network = netaddr.IPNetwork(subnet['cidr'])
+        argu['netmask'] = str(member_network.netmask)
+        argu['gateway'] = subnet['gateway_ip']
+        if member_network.version == 6:
+            idx = subnet['cidr'].find('/')
+            argu['netmask'] = subnet['cidr'][idx+1:]
+
         self.driver.create_member(argu)
         self.driver.write_memory(argu)
 
@@ -441,7 +446,19 @@ class ArrayADCDriver(object):
         argu['member_port'] = member['protocol_port']
 
         argu['vip_id'] = member['pool']['loadbalancer_id']
+        argu['subnet_id'] = member['subnet_id']
+        argu['member_address'] = member['address']
 
+        subnet = self.plugin_rpc.get_subnet(self.context, argu['subnet_id'])
+        argu['gateway'] = subnet['gateway_ip']
+
+        members = member['pool']['members']
+        #members count in same subnet
+        num_mem_same_ip = 0
+        for mem in members:
+            if mem['address'] == argu['member_address']:
+                num_mem_same_ip += 1
+        argu['num_of_mem'] = num_mem_same_ip
         self.driver.delete_member(argu)
         self.driver.write_memory(argu)
 
@@ -488,6 +505,7 @@ class ArrayADCDriver(object):
         argu = {}
         policy = rule['policy']
 
+        argu['tenant_id'] = rule['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
         LOG.debug("Delete all rules from policy in create_l7_rule")
         self.delete_all_rules(policy)
@@ -508,6 +526,7 @@ class ArrayADCDriver(object):
             LOG.debug("It doesn't need do any thing(update_l7_rule)")
             return
 
+        argu['tenant_id'] = rule['tenant_id']
         if rule['l7policy_id'] != old_rule['l7policy_id']:
             policy_changed = True
 
@@ -532,6 +551,7 @@ class ArrayADCDriver(object):
         argu = {}
         policy = rule['policy']
 
+        argu['tenant_id'] = rule['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
         LOG.debug("Delete all rules from policy in delete_l7_rule")
         self.delete_all_rules(policy)
@@ -544,6 +564,7 @@ class ArrayADCDriver(object):
         argu = {}
 
         listener = policy['listener']
+        argu['tenant_id'] = policy['tenant_id']
         argu['action'] = policy['action']
         argu['id'] = policy['id']
         argu['listener_id'] = policy['listener_id']
@@ -579,6 +600,7 @@ class ArrayADCDriver(object):
             return
 
         argu = {}
+        argu['tenant_id'] = policy['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
         self.delete_l7policy(old_policy, updated=True)
         self.create_l7policy(policy, updated=True)
@@ -590,6 +612,7 @@ class ArrayADCDriver(object):
     def delete_l7policy(self, policy, updated=False):
         argu = {}
         listener = policy['listener']
+        argu['tenant_id'] = policy['tenant_id']
         argu['action'] = policy['action']
         argu['id'] = policy['id']
         argu['listener_id'] = policy['listener_id']
@@ -619,6 +642,7 @@ class ArrayADCDriver(object):
         listener = policy['listener']
 
         argu['vip_id'] = listener['loadbalancer_id']
+        argu['tenant_id'] = policy['tenant_id']
         for rule in rules:
             argu['rule_type'] = rule['type']
             argu['rule_id'] = rule['id']
@@ -642,6 +666,7 @@ class ArrayADCDriver(object):
 
         argu['vip_id'] = listener['loadbalancer_id']
         argu['vs_id'] = policy['listener_id']
+        argu['tenant_id'] = policy['tenant_id']
         argu['action'] = policy['action']
         argu['redirect_url'] = policy['redirect_url']
         if policy['redirect_pool']:
@@ -702,4 +727,3 @@ class ArrayADCDriver(object):
                 self.driver.create_l7_rule(argu, action_created=created)
         else:
             LOG.debug("It doesn't support to create more than three rule in one policy.")
-
