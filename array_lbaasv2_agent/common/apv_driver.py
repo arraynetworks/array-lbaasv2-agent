@@ -597,7 +597,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         LOG.debug("The HA is on in the device(%s), ignore to \
                             init the device" % hostname)
                 except Exception:
-                    LOG.debug("Failed to get ha status...")
+                    LOG.debug("Failed to get ha status...%s" % % traceback.format_exc())
 
 
     def check_vlan_existed_in_device(self, vlan_tag):

@@ -820,6 +820,7 @@ class ADCDevice(object):
         cmd = "show segment name"
         return cmd
 
+    @staticmethod
     def ha_synconfig_bootup_on():
         cmd = "ha synconfig bootup on"
         return cmd
