@@ -131,6 +131,14 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to recovery LBs configuration: %s" % e.message)
 
+    def delete_redundant_segment_configuration(self):
+        LOG.info("Delete redundant LB configuration...");
+        try:
+            self.driver.driver.delete_redundant_segment_configuration()
+        except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
+            LOG.debug("failed to recovery LBs configuration: %s" % e.message)
+
     @log_helpers.log_method_call
     def create_loadbalancer_and_allocate_vip(self, context, obj):
         try:
