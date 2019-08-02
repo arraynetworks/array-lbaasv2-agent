@@ -58,6 +58,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_support():
+        cmd = "show support"
+        return cmd
+
+    @staticmethod
     def set_tcpidle(tcpidle_value):
         cmd = "system tune tcpidle %d" % tcpidle_value
         return cmd
