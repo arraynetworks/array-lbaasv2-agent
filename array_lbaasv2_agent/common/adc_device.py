@@ -848,6 +848,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def show_segment_nat(segment_name):
+        cmd = "show segment nat %s" % segment_name
+        return cmd
+
+    @staticmethod
     def ha_synconfig_bootup_on():
         cmd = "ha synconfig bootup on"
         return cmd
