@@ -27,7 +27,7 @@ from neutron_lbaas.services.loadbalancer import constants as lb_const
 
 LOG = logging.getLogger(__name__)
 
-off_hosts = []
+g_off_hosts = []
 redundant_segments = {}  # for example:{"segment_name1":{"times":2, "url_idx":0}, "segment_name2":{"times":3, "url_idx":1}}
 
 def parse_vlan_result(result, key):
@@ -79,6 +79,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.base_rest_urls = ["https://" + host + ":9997/rest/apv" for host in self.hostnames]
         self.segment_user_passwd = "click1@ARRAY"  #ToDo: get from configuration
         self.segment_enable = True
+        self.off_host = []
         self.net_seg_enable = cfg.CONF.arraynetworks.net_seg_enable
 
 
@@ -549,10 +550,16 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
 
     def run_cli_extend(self, base_rest_url, cmd, va_name=None, segment_enable=False,
-        connect_timeout=60, read_timeout=60, auth_val=None, run_timeout=60):
+        connect_timeout=20, read_timeout=20, auth_val=None, run_timeout=60,
+        check_off_host=True):
         exception = None
         if not cmd:
             return
+        if check_off_host:
+            if base_rest_url in self.off_host:
+                LOG.debug("It ignores running the cli(%s) because the url(%s) cannot be connected."\
+                    % (cmd, base_rest_url))
+                return
         url = base_rest_url + '/cli_extend'  #need verify
         payload = {
             "cmd": cmd,
@@ -882,12 +889,27 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             lb_mems[lb_id][member_name] = lb_const.ONLINE
         return lb_mems
 
+    def reset_off_host(self):
+        cmd_show_ip_addr = ADCDevice.show_ip_addr()
+        LOG.debug("Current self.off_host is %s" % self.off_host)
+        for base_rest_url in self.base_rest_urls:
+            status = self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
+                segment_enable=self.segment_enable, check_off_host=False)
+            if not status:
+                if base_rest_url not in self.off_host:
+                    self.off_host.append(base_rest_url)
+                    LOG.debug("Append %s into off_host(%s)", base_rest_url, self.off_host)
+            else:
+                if base_rest_url in self.off_host:
+                    self.off_host = [url for url in self.off_host if url != base_rest_url]
+                    LOG.debug("Removed %s into off_host(%s)", base_rest_url, self.off_host)
+
     def get_restful_status(self, base_rest_url):
         cmd_show_ip_addr = ADCDevice.show_ip_addr()
         status = None
         try:
             status = self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
-                segment_enable=self.segment_enable)
+                segment_enable=self.segment_enable, check_off_host=False)
         except Exception:
             return False
         if not status:
@@ -1136,6 +1158,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def delete_redundant_segment_configuration(self):
         try:
             if redundant_segments:
+                self.reset_off_host()
                 need_write_memory = False
                 base_rest_url = ""
                 for segment_name in redundant_segments.keys():
@@ -1219,20 +1242,21 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             LOG.debug("master_host(%s) is not current agent_host(%s), exiting" % (master_agent['host'], agent_host))
             return True
 
-        global off_hosts
-        LOG.debug("It will check the status of Host, current off hosts is : %s" % off_hosts)
+        global g_off_hosts
+        self.reset_off_host()
+        LOG.debug("It will check the status of Host, current off hosts is : %s" % g_off_hosts)
         for idx, base_rest_url in enumerate(self.base_rest_urls):
             host_status = self.get_restful_status(base_rest_url)
             hostname = self.hostnames[idx]
             if not host_status:
                 LOG.debug("Failed to connect the host(%s)" % hostname)
-                if hostname not in off_hosts:
-                    off_hosts.append(hostname)
-                    LOG.debug("Append the host(%s) into off_host(%s)" % (hostname, off_hosts))
+                if hostname not in g_off_hosts:
+                    g_off_hosts.append(hostname)
+                    LOG.debug("Append the host(%s) into off_host(%s)" % (hostname, g_off_hosts))
             else:
-                if hostname in off_hosts:
+                if hostname in g_off_hosts:
                     LOG.debug("Host(%s) is currently ON, but it is still on the \
-                        off_hosts(%s)" % (hostname, off_hosts))
+                        g_off_hosts(%s)" % (hostname, g_off_hosts))
                     status = self.get_ha_domain_status(idx)
                     if not status:
                         LOG.debug("The current status is NOT UP, so ignore to sync LB configuration.")
@@ -1249,10 +1273,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     else:
                         LOG.debug("Can't find any active host except the host(%s), so failed to \
                             synconfig", hostname)
-                    off_hosts.remove(hostname)
+                    g_off_hosts.remove(hostname)
 
 
     def update_member_status(self, agent_host_name):
+        self.reset_off_host()
         lb_members = self.plugin_rpc.get_members_status_on_agent(self.context,
             agent_host_name)
         lb_members_ori = copy.deepcopy(lb_members)

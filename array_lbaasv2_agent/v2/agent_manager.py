@@ -139,7 +139,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to delete redundant LBs configuration: %s" % e.message)
 
-    @log_helpers.log_method_call
     def create_loadbalancer_and_allocate_vip(self, context, obj):
         try:
             self.driver.create_loadbalancer_and_allocate_vip(obj)
@@ -148,7 +147,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create loadbalancer: %s', e.msg)
             self.plugin_rpc.lb_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def create_loadbalancer(self, context, obj):
         try:
             self.driver.create_loadbalancer(obj)
@@ -160,7 +158,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('failed to create loadbalancer: %s', e.message)
             self.plugin_rpc.lb_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_loadbalancer(self, context, obj, old_obj):
         try:
             self.driver.update_loadbalancer(obj, old_obj)
@@ -169,7 +166,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update loadbalancer: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.lb_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_loadbalancer(self, context, obj):
         try:
             self.driver.delete_loadbalancer(obj)
@@ -183,7 +179,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('failed to delete loadbalancer: %s, %s', obj['id'], e.message)
             self.plugin_rpc.lb_deleting_completion(context, obj)
 
-    @log_helpers.log_method_call
     def create_listener(self, context, obj):
         try:
             self.driver.create_listener(obj)
@@ -192,7 +187,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create listener: %s', e.msg)
             self.plugin_rpc.listener_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_listener(self, context, obj, old_obj):
         try:
             self.driver.update_listener(obj, old_obj)
@@ -201,7 +195,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update loadbalancer: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.listener_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_listener(self, context, obj):
         try:
             self.driver.delete_listener(obj)
@@ -210,7 +203,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not delete listener: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.listener_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def create_pool(self, context, obj):
         try:
             self.driver.create_pool(obj)
@@ -219,7 +211,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create pool: %s', e.msg)
             self.plugin_rpc.pool_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_pool(self, context, obj, old_obj):
         try:
             self.driver.update_pool(obj, old_obj)
@@ -228,7 +219,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update pool: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.pool_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_pool(self, context, obj):
         try:
             self.driver.delete_pool(obj)
@@ -237,7 +227,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not delete pool: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.pool_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def create_member(self, context, obj):
         try:
             self.driver.create_member(obj)
@@ -246,7 +235,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create member: %s', e.msg)
             self.plugin_rpc.member_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_member(self, context, obj, old_obj):
         try:
             self.driver.update_member(obj, old_obj)
@@ -255,7 +243,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update member: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.member_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_member(self, context, obj):
         try:
             self.driver.delete_member(obj)
@@ -264,7 +251,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not delete member: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.member_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def create_health_monitor(self, context, obj):
         try:
             self.driver.create_health_monitor(obj)
@@ -273,7 +259,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create health_monitor: %s', e.msg)
             self.plugin_rpc.hm_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_health_monitor(self, context, obj, old_obj):
         try:
             self.driver.update_health_monitor(obj, old_obj)
@@ -282,7 +267,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update hm: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.hm_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_health_monitor(self, context, obj):
         try:
             self.driver.delete_health_monitor(obj)
@@ -291,11 +275,9 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not delete hm: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.hm_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_loadbalancer_stats(self, context, obj):
         pass
 
-    @log_helpers.log_method_call
     def create_l7rule(self, context, obj):
         try:
             self.driver.create_l7rule(obj)
@@ -304,7 +286,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create l7rule: %s', e.msg)
             self.plugin_rpc.l7rule_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_l7rule(self, context, obj, old_obj):
         try:
             self.driver.update_l7rule(obj, old_obj)
@@ -313,7 +294,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update l7rule: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.l7rule_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_l7rule(self, context, obj):
         try:
             self.driver.delete_l7rule(obj)
@@ -322,7 +302,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not delete l7rule: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.l7rule_deleting_completion(context, obj)
 
-    @log_helpers.log_method_call
     def create_l7policy(self, context, obj):
         try:
             self.driver.create_l7policy(obj)
@@ -331,7 +310,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not create l7policy: %s', e.msg)
             self.plugin_rpc.l7policy_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def update_l7policy(self, context, obj, old_obj):
         try:
             self.driver.update_l7policy(obj, old_obj)
@@ -340,7 +318,6 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             LOG.exception('could not update l7policy: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.l7policy_failed_completion(context, obj)
 
-    @log_helpers.log_method_call
     def delete_l7policy(self, context, obj):
         try:
             self.driver.delete_l7policy(obj)
