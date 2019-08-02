@@ -186,6 +186,7 @@ class ArrayADCDriver(object):
         if member_network.version == 6:
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
+        self.driver.reset_off_host()
         self.driver.create_loadbalancer(argu)
 
 
@@ -227,6 +228,7 @@ class ArrayADCDriver(object):
                 if network_type:
                     argu['network_type'] = network_type
 
+        self.driver.reset_off_host()
         self.driver.delete_loadbalancer(argu)
 
 
@@ -234,7 +236,8 @@ class ArrayADCDriver(object):
         pass
 
 
-    def create_listener(self, obj):
+    def create_listener(self, obj, updated=False):
+        LOG.debug("Create a listener on Array ADC device")
         listener = obj
         lb = listener['loadbalancer']
         argu = {}
@@ -262,22 +265,35 @@ class ArrayADCDriver(object):
         else:
             argu['pool_id'] = None
 
+        if not updated:
+            self.driver.reset_off_host()
+
         self.driver.create_listener(argu)
-        self.driver.write_memory(argu)
+
+        if not updated:
+            self.driver.write_memory(argu)
 
 
     def update_listener(self, obj, old_obj):
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Listener
         # handle the change of "connection_limit" only
+        LOG.debug("Update a listener on Array ADC device")
         if obj['connection_limit'] != old_obj['connection_limit']:
             # firstly delete this listener, it will cause policy is deleted as well
-            self.delete_listener(old_obj)
+            self.driver.reset_off_host()
 
-            # re-create listener and policy
-            self.create_listener(obj)
+            self.delete_listener(old_obj, updated=True)
+
+            self.create_listener(obj, updated=True)
+            listener = obj
+            argu['tenant_id'] = listener['tenant_id']
+            lb = listener['loadbalancer']
+            argu['vip_id'] = lb['stats']['loadbalancer_id']
+            self.driver.write_memory(argu)
 
 
-    def delete_listener(self, obj):
+    def delete_listener(self, obj, updated=False):
+        LOG.debug("Delete a listener on Array ADC device")
         listener = obj
         argu = {}
 
@@ -300,11 +316,17 @@ class ArrayADCDriver(object):
         else:
             argu['pool_id'] = None
 
+        if not updated:
+            self.driver.reset_off_host()
+
         self.driver.delete_listener(argu)
-        self.driver.write_memory(argu)
+
+        if not updated:
+            self.driver.write_memory(argu)
 
 
     def create_pool(self, obj, updated=False):
+        LOG.debug("Create a pool on Array ADC device")
         pool = obj
         sp_type = None
         ck_name = None
@@ -330,6 +352,8 @@ class ArrayADCDriver(object):
         else:
             argu['listener_id'] = None
 
+        if not updated:
+            self.driver.reset_off_host()
         self.driver.create_pool(argu)
         if not updated:
             self.driver.write_memory(argu)
@@ -337,6 +361,7 @@ class ArrayADCDriver(object):
 
     def update_pool(self, obj, old_obj):
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Pool
+        LOG.debug("Update a pool on Array ADC device")
         need_recreate = False
         for changed in ('lb_algorithm', 'session_persistence'):
             if obj[changed] != old_obj[changed]:
@@ -349,6 +374,7 @@ class ArrayADCDriver(object):
             argu['pool_id'] = obj['id']
             lb = obj['loadbalancer']
             argu['vip_id'] = lb['stats']['loadbalancer_id']
+            self.driver.reset_off_host()
             # firstly delete old group
             self.delete_pool(old_obj, updated=True)
 
@@ -378,6 +404,7 @@ class ArrayADCDriver(object):
             self.driver.write_memory(argu)
 
     def delete_pool(self, obj, updated=False):
+        LOG.debug("Delete a pool on Array ADC device")
         pool = obj
 
         sp_type = None
@@ -403,11 +430,14 @@ class ArrayADCDriver(object):
         else:
             argu['listener_id'] = None
 
+        if not updated:
+            self.driver.reset_off_host()
         self.driver.delete_pool(argu)
         if not updated:
             self.driver.write_memory(argu)
 
     def create_member(self, obj):
+        LOG.debug("Create a member on Array ADC device")
         member = obj
         pool = member['pool']
         argu = {}
@@ -431,17 +461,21 @@ class ArrayADCDriver(object):
             idx = subnet['cidr'].find('/')
             argu['netmask'] = subnet['cidr'][idx+1:]
 
+        self.driver.reset_off_host()
         self.driver.create_member(argu)
         self.driver.write_memory(argu)
 
     def update_member(self, obj, old_obj):
+        LOG.debug("Update a member on Array ADC device")
         # see: https://wiki.openstack.org/wiki/Neutron/LBaaS/API_2.0#Update_a_Member_of_a_Pool
         if obj['weight'] != old_obj['weight']:
             # FIXME: should directly update the weight
+            self.driver.reset_off_host()
             self.delete_member(old_obj)
             self.create_member(obj)
 
     def delete_member(self, obj):
+        LOG.debug("Delete a member on Array ADC device")
         member = obj
         pool = member['pool']
         argu = {}
@@ -465,10 +499,12 @@ class ArrayADCDriver(object):
             if mem['address'] == argu['member_address']:
                 num_mem_same_ip += 1
         argu['num_of_mem'] = num_mem_same_ip
+        self.driver.reset_off_host()
         self.driver.delete_member(argu)
         self.driver.write_memory(argu)
 
     def create_health_monitor(self, obj):
+        LOG.debug("Create a hm on Array ADC device")
         hm = obj
         argu = {}
 
@@ -483,20 +519,24 @@ class ArrayADCDriver(object):
         argu['hm_expected_codes'] = hm['expected_codes']
         argu['pool_id'] = hm['pool']['id']
         argu['vip_id'] = hm['pool']['loadbalancer_id']
+        self.driver.reset_off_host()
         self.driver.create_health_monitor(argu)
         self.driver.write_memory(argu)
 
     def update_health_monitor(self, obj, old_obj):
+        LOG.debug("Update a hm on Array ADC device")
         need_recreate = False
         for changed in ('delay', 'timeout', 'max_retries', 'http_method', 'url_path', 'expected_codes'):
             if obj[changed] != old_obj[changed]:
                 need_recreate = True
 
         if need_recreate:
+            self.driver.reset_off_host()
             self.delete_health_monitor(old_obj)
             self.create_health_monitor(obj)
 
     def delete_health_monitor(self, obj):
+        LOG.debug("Delete a hm on Array ADC device")
         hm = obj
         argu = {}
 
@@ -504,15 +544,18 @@ class ArrayADCDriver(object):
         argu['hm_id'] = hm['id']
         argu['pool_id'] = hm['pool']['id']
         argu['vip_id'] = hm['pool']['loadbalancer_id']
+        self.driver.reset_off_host()
         self.driver.delete_health_monitor(argu)
         self.driver.write_memory(argu)
 
     def create_l7rule(self, rule):
+        LOG.debug("Create a L7RULE on Array ADC device")
         argu = {}
         policy = rule['policy']
 
         argu['tenant_id'] = rule['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
+        self.driver.reset_off_host()
         LOG.debug("Delete all rules from policy in create_l7_rule")
         self.delete_all_rules(policy)
         LOG.debug("Create all rules from policy in create_l7_rule")
@@ -521,6 +564,8 @@ class ArrayADCDriver(object):
 
 
     def update_l7rule(self, rule, old_rule):
+        LOG.debug("Update a L7RULE on Array ADC device")
+        argu = {}
         argu = {}
         need_recreate = False
         policy_changed = False
@@ -539,6 +584,7 @@ class ArrayADCDriver(object):
         old_policy = old_rule['policy']
         policy = rule['policy']
         if policy_changed or need_recreate:
+            self.driver.reset_off_host()
             LOG.debug("Delete all rules from old policy in update_l7_rule")
             self.delete_all_rules(old_policy)
             if policy_changed:
@@ -554,11 +600,13 @@ class ArrayADCDriver(object):
             self.driver.write_memory(argu)
 
     def delete_l7rule(self, rule):
+        LOG.debug("Delete a L7RULE on Array ADC device")
         argu = {}
         policy = rule['policy']
 
         argu['tenant_id'] = rule['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
+        self.driver.reset_off_host()
         LOG.debug("Delete all rules from policy in delete_l7_rule")
         self.delete_all_rules(policy)
         LOG.debug("Create all rules from policy in delete_l7_rule")
@@ -567,6 +615,7 @@ class ArrayADCDriver(object):
 
 
     def create_l7policy(self, policy, updated=False):
+        LOG.debug("Create a L7Policy on Array ADC device")
         argu = {}
 
         listener = policy['listener']
@@ -590,12 +639,15 @@ class ArrayADCDriver(object):
             argu['cookie_name'] = ck_name
             argu['lb_algorithm'] = pool['lb_algorithm']
 
+        if not updated:
+            self.driver.reset_off_host()
         self.driver.create_l7_policy(argu, updated=updated)
         if not updated:
             self.driver.write_memory(argu)
 
 
     def update_l7policy(self, policy, old_policy):
+        LOG.debug("Update a L7Policy on Array ADC device")
         need_recreate = False
         for changed in ('action', 'redirect_pool_id', 'redirect_url'):
             if policy[changed] != old_policy[changed]:
@@ -608,6 +660,7 @@ class ArrayADCDriver(object):
         argu = {}
         argu['tenant_id'] = policy['tenant_id']
         argu['vip_id'] = policy['listener']['loadbalancer_id']
+        self.driver.reset_off_host()
         self.delete_l7policy(old_policy, updated=True)
         self.create_l7policy(policy, updated=True)
 
@@ -616,6 +669,7 @@ class ArrayADCDriver(object):
 
 
     def delete_l7policy(self, policy, updated=False):
+        LOG.debug("Delete a L7Policy on Array ADC device")
         argu = {}
         listener = policy['listener']
         argu['tenant_id'] = policy['tenant_id']
@@ -633,6 +687,9 @@ class ArrayADCDriver(object):
                 sp_type = pool['session_persistence']['type']
             argu['session_persistence_type'] = sp_type
             argu['lb_algorithm'] = pool['lb_algorithm']
+
+        if not updated:
+            self.driver.reset_off_host()
 
         LOG.debug("Delete all rules from policy in delete_l7_policy")
         self.delete_all_rules(policy)
