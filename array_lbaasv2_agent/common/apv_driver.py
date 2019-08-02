@@ -620,7 +620,17 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             init the device" % hostname)
                 except Exception:
                     LOG.debug("Failed to get ha status...%s" % traceback.format_exc())
-
+        elif len(self.hostnames) == 1:
+            try:
+                support_exist = self.show_support()
+                if not support_exist:
+                    LOG.debug("The support configuration is not in the device(%s)" % self.hostnames[0])
+                    self.init_single_device()
+                else:
+                    LOG.debug("The support configuration is in the device(%s), ignore to \
+                        init the single device" % self.hostnames[0])
+            except Exception:
+                LOG.debug("Failed to get support configuration...%s" % traceback.format_exc())
 
     def check_vlan_existed_in_device(self, vlan_tag):
         device_name = "vlan." + str(vlan_tag)
@@ -738,10 +748,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
     def init_one_array_device(self, cur_idx):
         base_rest_url = self.base_rest_urls[cur_idx]
-        #rts
-        if not self.net_seg_enable:
-            cmd_rts_enable = ADCDevice.rts_enable()
-            self.run_cli_extend(base_rest_url, cmd_rts_enable, segment_enable=self.segment_enable)
         cmd_ha_ssf_timeout = ADCDevice.ha_ssf_timeout(3600)
         self.run_cli_extend(base_rest_url, cmd_ha_ssf_timeout, segment_enable=self.segment_enable)
         cmd_load_error_page = ADCDevice.load_http_error_page()
@@ -801,6 +807,26 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_segment, segment_enable=self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_apv_write_memory, segment_enable=self.segment_enable)
 
+
+    def init_single_device(self):
+        base_rest_url = self.base_rest_urls[0]
+        cmd_load_error_page = ADCDevice.load_http_error_page()
+        self.run_cli_extend(base_rest_url, cmd_load_error_page, segment_enable=self.segment_enable)
+        cmd_support_enable = ADCDevice.support_enable()
+        self.run_cli_extend(base_rest_url, cmd_support_enable, segment_enable=self.segment_enable)
+        tcpidle_value = 3600
+        cmd_set_tcpidle = ADCDevice.set_tcpidle(tcpidle_value)
+        self.run_cli_extend(base_rest_url, cmd_set_tcpidle, segment_enable=self.segment_enable)
+        cmd_ssh_ip = ADCDevice.ssh_ip(self.hostnames[0])
+        self.run_cli_extend(base_rest_url, cmd_ssh_ip, segment_enable=self.segment_enable)
+        if self.net_seg_enable:
+            cmd_segment = ADCDevice.segment_enable()
+        else:
+            cmd_segment = ADCDevice.segment_disable()
+        self.run_cli_extend(base_rest_url, cmd_segment, segment_enable=self.segment_enable)
+        cmd_apv_write_memory = ADCDevice.write_memory()
+        self.run_cli_extend(base_rest_url, cmd_apv_write_memory, segment_enable=self.segment_enable)
+        LOG.debug("Successful download init configuration for single host %s", self.hostnames[0])
 
     def get_all_health_status(self, va_name, lb_id):
         status_dic = {}
@@ -1058,6 +1084,15 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             segment_enable=self.segment_enable, connect_timeout=180, read_timeout=180)
         if "ha off" in r.text:
             LOG.debug("The HA is disabled on the host(%s): %s" % (self.hostnames[idx], r.text))
+            return False
+        return True
+
+    def show_support(self):
+        base_rest_url = self.base_rest_urls[0]
+        cmd_show_support = ADCDevice.show_support()
+        r = self.run_cli_extend(base_rest_url, cmd_show_support, segment_enable=self.segment_enable)
+        if "support" not in r.text:
+            LOG.debug("The support config is not in the host(%s): %s" % (self.hostnames[0], r.text))
             return False
         return True
 
