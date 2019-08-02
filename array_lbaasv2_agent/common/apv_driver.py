@@ -61,7 +61,7 @@ def parse_segment_nat_result(result):
 def parse_vlan_by_seg_if(ret_seg_if):
     seg_if = ret_seg_if.split()
     if seg_if:
-        return seg_if[:-1]
+        return seg_if[-1]
     else:
         return None
 
@@ -295,7 +295,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     ip_address = res_inst_ports[host]['address']
                     if self.net_seg_enable and not internal_ip:
                         internal_ip = self.plugin_rpc.get_available_internal_ip(self.context,
-                            segment_name, ip_address)
+                            segment_name, argu['vip_address'])
+                        LOG.debug("get the internal ip(%s) by segment(%s) and ip(%s)", internal_ip, segment_name, argu['vip_address'])
                         if internal_ip == None:
                             LOG.error("Failed to get available internal ip address for create loadbalancer")
                             return
@@ -985,7 +986,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 return True
             base_rest_url = self.base_rest_urls[idx]
             if not self.net_seg_enable:
-                for lb_id, subnet_id in lb_ids:
+                for lb_id, subnet_id, vip_address in lb_ids:
                     ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
                     segment_name = ret_segment_name['segment_name']
                     if len(segment_name) == 0:
@@ -1028,7 +1029,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         continue
                     self._create_segment_config(base_rest_url, segment_name)
             else:
-                for lb_id, subnet_id in lb_ids:
+                for lb_id, subnet_id, vip_address in lb_ids:
                     ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
                     segment_name = ret_segment_name['segment_name']
                     if len(segment_name) == 0:
@@ -1056,6 +1057,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
                             self.run_cli_extend(base_rest_url, cmd_vlan_device,
                                 segment_enable=self.segment_enable)
+                            self._create_segment_config(base_rest_url, segment_name)
                             self._segment_interface(base_rest_url, vlan_tag, segment_name, None, interface_name)
                             #config segment ip address
                             ip_address = ret_ports[0]['fixed_ips'][0]['ip_address']
@@ -1065,34 +1067,29 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             if vip_network.version == 6:
                                 idx = subnet['cidr'].find('/')
                                 netmask = subnet['cidr'][idx+1:]
-                            internal_ip = self.plugin_rpc.get_internal_ip_by_lb(self.context, segment_name, ip_address)
+                            internal_ip = self.plugin_rpc.get_internal_ip_by_lb(self.context, segment_name, vip_address)
+                            LOG.debug("get the internal ip(%s) by segment(%s) and ip(%s)", internal_ip, segment_name, vip_address)
                             if not internal_ip:
-                                LOG.error("Failed to find the internal ip by segment name(%s) and segment ip(%s)" % (segment_name, ip_address))
+                                LOG.error("Failed to find the internal ip by segment name(%s) and segment ip(%s)" % (segment_name, vip_address))
                                 return
-                            cmd_apv_config_ip = ADCDevice.configure_segment_ip(interface_name, ip_address, netmask, internal_ip)
+                            cmd_apv_config_ip = ADCDevice.configure_segment_ip(device_name, ip_address, netmask, internal_ip)
                             self.run_cli_extend(base_rest_url, cmd_apv_config_ip,
                                 segment_enable=self.segment_enable)
-                            #config default route
-                            cmd_apv_config_route = ADCDevice.configure_route(subnet['gateway_ip'])
-                            self.run_cli_extend(base_rest_url, cmd_apv_config_route,
-                                segment_enable=self.segment_enable)
+
                             #add segment nat
                             cmd_show_segment_nat = ADCDevice.show_segment_nat(segment_name)
                             result = self.run_cli_extend(self.base_rest_urls[1 - idx], cmd_show_segment_nat,
                                 segment_enable=self.segment_enable)
                             if not result:
-                                return None
+                                LOG.debug("Failed to get segment nat from the host %s", self.hostnames[1 - idx])
                             else:
                                 res_dict = json.loads(result.text)
-                                segment_nat_cmds = parse_segment_nat_result(res_dict['contents'])
-                                for segment_nat_cmd in segment_nat_cmds:
-                                    self.run_cli_extend(self.base_rest_urls[idx], segment_nat_cmd,
-                                        segment_enable=self.segment_enable)
-                    #create segment name and user
-                    if len(segment_name) == 0:
-                        LOG.debug("Failed to get the segment name by segment_name(%s)" % segment_name)
-                        continue
-                    self._create_segment_config(base_rest_url, segment_name)
+                                res_contents = res_dict['contents']
+                                if res_contents:
+                                    segment_nat_cmds = parse_segment_nat_result(res_contents)
+                                    for segment_nat_cmd in segment_nat_cmds:
+                                        self.run_cli_extend(self.base_rest_urls[idx], segment_nat_cmd,
+                                            segment_enable=self.segment_enable)
                     self.synconfig_from_segment(base_rest_url, idx, segment_name)
             cmd_write_memory = ADCDevice.write_memory()
             self.run_cli_extend(base_rest_url, cmd_write_memory, segment_enable=self.segment_enable)
@@ -1173,7 +1170,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                         need_write_memory = True
                         idx = redundant_segments[segment_name]["url_idx"]
                         base_rest_url = self.base_rest_urls[idx]
-                        vlan_ifname = self.get_vlan_conf_by_segment(self.base_rest_urls[1 - idx], segment_name)
+                        vlan_ifname = self.get_vlan_conf_by_segment(base_rest_url, segment_name)
                         cmd_delete_segment = ADCDevice.delete_segment(segment_name)
                         self.run_cli_extend(base_rest_url, cmd_delete_segment, segment_enable=self.segment_enable)
                         cmd_delete_segment_user = ADCDevice.delete_segment_user(segment_name[:10] + "_api")
@@ -1196,7 +1193,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         segment_names = []
 
         if isinstance(lb_ids, list):
-            for lb_id, subnet_id in lb_ids:
+            for lb_id, subnet_id, vip_address in lb_ids:
                 ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
                 segment_name = ret_segment_name['segment_name']
                 segment_names.append(segment_name)
