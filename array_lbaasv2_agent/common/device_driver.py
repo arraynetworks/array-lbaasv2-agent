@@ -53,6 +53,11 @@ OPTS = [
         default='click1',
         help=('APV Restful API password')
     ),
+    cfg.StrOpt(
+        'segment_config_password',
+        default='Array123',
+        help=('APV Restful API password')
+    ),
     cfg.BoolOpt(
         'bonding',
         default=False,
@@ -363,8 +368,9 @@ class ArrayADCDriver(object):
                 self.driver.update_health_monitor(argu)
 
             # update L7 policy
-            if obj['l7_policies']:
-                for policy in obj['l7_policies']:
+            listener = obj['listener']
+            if listener:
+                for policy in listener['l7_policies']:
                     self.create_l7policy(policy, updated=True)
                     if policy['rules']:
                         self.create_all_rules(policy)

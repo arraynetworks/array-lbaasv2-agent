@@ -121,9 +121,9 @@ class ArrayPluginApi(object):
             device_id, fixed_address_count=1):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'create_port_on_subnet',
-            subnet_id=subnet_id, name=name, host=host,
-            device_id=device_id,
-            fixed_address_count=fixed_address_count)
+                subnet_id=subnet_id, name=name, host=host,
+                device_id=device_id,
+                fixed_address_count=fixed_address_count)
 
     def get_subnet(self, context, subnet_id):
         cctxt = self.client.prepare()
@@ -169,6 +169,17 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'generate_tags')
 
+    def generate_ha_group_id(self, context, lb_id, subnet_id,
+        tenant_id, segment_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'generate_ha_group_id',
+            lb_id=lb_id, subnet_id=subnet_id,
+            tenant_id=tenant_id, segment_name=segment_name)
+
+    def get_segment_name_by_lb_id(self, context, vip_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_segment_name_by_lb_id', vip_id=vip_id)
+
     def get_va_name_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_va_name_by_lb_id', vip_id=vip_id)
@@ -176,6 +187,10 @@ class ArrayPluginApi(object):
     def get_vapv_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vapv_by_lb_id', vip_id=vip_id)
+
+    def get_loadbalancer_ids(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_loadbalancer_ids')
 
     def create_vapv(self, context, vapv_name, lb_id, subnet_id,
         in_use_lb, pri_port_id, sec_port_id, cluster_id):
@@ -185,17 +200,17 @@ class ArrayPluginApi(object):
             sec_port_id=sec_port_id, in_use_lb=in_use_lb,
             cluster_id=cluster_id)
 
+    def get_port_by_name(self, context, port_name):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_port_by_name', port_name=port_name)
+
     def delete_vapv(self, context, vapv_name):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'delete_vapv', vapv_name=vapv_name)
 
-    def update_excepted_vapv_by_name(self, context, vapv_name):
+    def get_active_agents(self, context):
         cctxt = self.client.prepare()
-        return cctxt.call(context, 'update_excepted_vapv_by_name', va_name=vapv_name)
-
-    def get_excepted_vapvs(self, context):
-        cctxt = self.client.prepare()
-        return cctxt.call(context, 'get_excepted_vapvs')
+        return cctxt.call(context, 'get_active_agents')
 
     def update_member_status(self, context, member_id, operating_status):
         cctxt = self.client.prepare()
@@ -208,8 +223,40 @@ class ArrayPluginApi(object):
         return cctxt.call(context, 'check_subnet_used', subnet_id=subnet_id,
             lb_id_filter=lb_id_filter, member_id_filter=member_id_filter)
 
+    def get_segment_used(self, context, segment_name, lb_id_filter=None):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_segment_used', segment_name=segment_name,
+            lb_id_filter=lb_id_filter)
+
     def get_members_status_on_agent(self, context, agent_host_name):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_members_status_on_agent',
             agent_host_name=agent_host_name)
+
+    def get_clusterids_by_lb(self, context, lb_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_cluster_id_by_lb_id',
+            lb_id=lb_id)
+
+    def get_available_internal_ip(self, context, segment_name, segment_ip, use_for_nat=False):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_available_internal_ip',
+            seg_name=segment_name, seg_ip=segment_ip, use_for_nat=use_for_nat)
+
+    def get_internal_ip_by_lb(self, context, segment_name, segment_ip, use_for_nat=False):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_internal_ip_by_lb',
+            seg_name=segment_name, seg_ip=segment_ip, use_for_nat=use_for_nat)
+
+    def get_interface(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_interface')
+
+    def get_interface_port(self, context, bond):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_interface_port', bond=bond)
+
+    def get_all_interfaces(self, context):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_all_interfaces')
 

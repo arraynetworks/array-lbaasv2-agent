@@ -14,6 +14,7 @@
 from oslo_config import cfg
 from oslo_log import helpers as log_helpers
 import logging
+import traceback
 import oslo_messaging
 
 try:
@@ -92,7 +93,10 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         heartbeat_lb_status.start(interval=45)
 
         recovery_lb_status = loopingcall.FixedIntervalLoopingCall(self.recovery_lbs_configuration)
-        recovery_lb_status.start(interval=60)
+        recovery_lb_status.start(interval=120)
+
+        delete_redundant_segment = loopingcall.FixedIntervalLoopingCall(self.delete_redundant_segment_configuration)
+        delete_redundant_segment.start(interval=120)
 
         scrub_dead_agents = loopingcall.FixedIntervalLoopingCall(self.scrub_dead_agents)
         scrub_dead_agents.start(interval=150)
@@ -100,15 +104,19 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
 
     def scrub_dead_agents(self):
         try:
-            self.plugin_rpc.scrub_dead_agents(context)
+            LOG.info("Scrub dead agents...");
+            self.plugin_rpc.scrub_dead_agents(self.context)
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to scrub dead agents: %s" % e.message)
 
 
     def update_lb_status(self):
         try:
+            LOG.info("Update member status ...");
             self.driver.driver.update_member_status(self.agent_host)
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to update member status: %s" % e.message)
 
     def _report_state(self):
@@ -120,6 +128,15 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
         try:
             self.driver.driver.recovery_lbs_configuration()
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
+            LOG.debug("failed to recovery LBs configuration: %s" % e.message)
+
+    def delete_redundant_segment_configuration(self):
+        LOG.info("Delete redundant LB configuration...");
+        try:
+            self.driver.driver.delete_redundant_segment_configuration()
+        except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.debug("failed to recovery LBs configuration: %s" % e.message)
 
     @log_helpers.log_method_call
@@ -158,9 +175,11 @@ class LbaasAgentManager(periodic_task.PeriodicTasks):
             self.driver.delete_loadbalancer(obj)
             self.plugin_rpc.lb_deleting_completion(context, obj)
         except ArrayADCException as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.exception('could not delete loadbalancer: %s, %s', obj['id'], e.msg)
             self.plugin_rpc.lb_deleting_completion(context, obj)
         except Exception as e:
+            LOG.debug("Trace: %s " % traceback.format_exc())
             LOG.exception('failed to delete loadbalancer: %s, %s', obj['id'], e.message)
             self.plugin_rpc.lb_deleting_completion(context, obj)
 
