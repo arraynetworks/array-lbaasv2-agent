@@ -795,7 +795,7 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
-    def write_segment_memory(segment_name):
+    def write_segment_memory(segment_name=None):
         if segment_name:
             cmd = "write segment memory %s" % segment_name
         else:
