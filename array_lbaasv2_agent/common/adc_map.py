@@ -38,6 +38,7 @@ def array_protocol_map(protocol, port=None):
         lb_const.PROTOCOL_TCP: lb_const.PROTOCOL_TCP,
         lb_const.PROTOCOL_HTTPS: lb_const.PROTOCOL_TCP,
         lb_const.PROTOCOL_HTTP: lb_const.PROTOCOL_HTTP,
+        "UDP": "UDP",
         lb_const.PROTOCOL_TERMINATED_HTTPS: lb_const.PROTOCOL_HTTPS,
     }
     if port and port == '21' and protocol == lb_const.PROTOCOL_TCP:
