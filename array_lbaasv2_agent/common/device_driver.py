@@ -286,6 +286,7 @@ class ArrayADCDriver(object):
 
             self.create_listener(obj, updated=True)
             listener = obj
+            argu = {}
             argu['tenant_id'] = listener['tenant_id']
             lb = listener['loadbalancer']
             argu['vip_id'] = lb['stats']['loadbalancer_id']
@@ -399,6 +400,7 @@ class ArrayADCDriver(object):
                 for policy in listener['l7_policies']:
                     self.create_l7policy(policy, updated=True)
                     if policy['rules']:
+                        self.delete_all_rules(policy)
                         self.create_all_rules(policy)
 
             self.driver.write_memory(argu)
