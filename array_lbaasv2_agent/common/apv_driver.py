@@ -986,7 +986,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 return True
             base_rest_url = self.base_rest_urls[idx]
             if not self.net_seg_enable:
-                for lb_id, subnet_id, vip_address in lb_ids:
+                for lb_id, subnet_id, vip_address, vip_port_id in lb_ids:
                     ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
                     segment_name = ret_segment_name['segment_name']
                     if len(segment_name) == 0:
@@ -998,7 +998,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     port_name = segment_name + "_" + str(idx)
                     ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
                     if len(ret_ports) > 0:
-                        port_id = ret_ports[0]['id']
+                        port_id = vip_port_id
                         ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
                         vlan_tag = ret_vlan['vlan_tag']
                         if vlan_tag == '-1':
@@ -1024,12 +1024,35 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
                             self.run_cli_extend(base_rest_url, cmd_configure_ip,
                                 segment_enable=self.segment_enable)
+                            self._create_segment_config(base_rest_url, segment_name)
+                            #sync ha
+                            group_id = self.find_available_cluster_id(self.context, lb_id)
+                            cmd_ha_group_id = ADCDevice.ha_group_id(group_id)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_id, segment_enable=self.segment_enable)
+                            cmd_ha_group_master_priority = ADCDevice.ha_group_priority("unit_m", group_id, 100)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_master_priority, segment_enable=self.segment_enable)
+                            cmd_ha_group_slave_priority = ADCDevice.ha_group_priority("unit_s", group_id, 90)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_slave_priority, segment_enable=self.segment_enable)
+                            cmd_ha_group_enable = ADCDevice.ha_group_enable(group_id)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_enable, segment_enable=self.segment_enable)
+                            idx = int(interface_name[4:])
+                            cmd_ha_decision_rule = ADCDevice.ha_decision_rule_apv(idx, group_id)
+                            cmd_ha_group_fip_vip = ADCDevice.ha_group_fip(group_id, vip_address, device_name)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, segment_enable=self.segment_enable)
+                            port_name = 'ha_' + lb_id + "_pool"
+                            ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
+                            LOG.debug("Got the ret_ports(%s) by the port_name(%s)", ret_ports, port_name)
+                            if ret_ports:
+                                pool_address = ret_ports[0]['fixed_ips'][0]['ip_address']
+                                cmd_ha_group_fip_pool = ADCDevice.ha_group_fip(group_id, pool_address, device_name)
+                                self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, segment_enable=self.segment_enable)
+                            self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, segment_enable=self.segment_enable)
+                            self.synconfig_from_segment(base_rest_url, idx, segment_name)
                     else:
                         LOG.debug("Cannot to get port by name(%s)" % port_name)
                         continue
-                    self._create_segment_config(base_rest_url, segment_name)
             else:
-                for lb_id, subnet_id, vip_address in lb_ids:
+                for lb_id, subnet_id, vip_address, vip_port_id in lb_ids:
                     ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
                     segment_name = ret_segment_name['segment_name']
                     if len(segment_name) == 0:
@@ -1041,7 +1064,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     port_name = segment_name + "_" + str(idx)
                     ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
                     if len(ret_ports) > 0:
-                        port_id = ret_ports[0]['id']
+                        port_id = vip_port_id
                         ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
                         vlan_tag = ret_vlan['vlan_tag']
                         if vlan_tag == '-1':
@@ -1087,10 +1110,35 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                                 res_contents = res_dict['contents']
                                 if res_contents:
                                     segment_nat_cmds = parse_segment_nat_result(res_contents)
+                                    LOG.debug("get the segment nat cmd %s", segment_nat_cmds)
                                     for segment_nat_cmd in segment_nat_cmds:
                                         self.run_cli_extend(self.base_rest_urls[idx], segment_nat_cmd,
                                             segment_enable=self.segment_enable)
-                    self.synconfig_from_segment(base_rest_url, idx, segment_name)
+                            #sync ha
+                            group_id = self.find_available_cluster_id(self.context, lb_id)
+                            cmd_ha_group_id = ADCDevice.ha_group_id(group_id)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_id, segment_enable=self.segment_enable)
+                            cmd_ha_group_master_priority = ADCDevice.ha_group_priority("unit_m", group_id, 100)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_master_priority, segment_enable=self.segment_enable)
+                            cmd_ha_group_slave_priority = ADCDevice.ha_group_priority("unit_s", group_id, 90)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_slave_priority, segment_enable=self.segment_enable)
+                            cmd_ha_group_enable = ADCDevice.ha_group_enable(group_id)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_enable, segment_enable=self.segment_enable)
+                            idx = int(interface_name[4:])
+                            cmd_ha_decision_rule = ADCDevice.ha_decision_rule_apv(idx, group_id)
+                            cmd_ha_group_fip_vip = ADCDevice.ha_group_fip_apv(group_id, vip_address, segment_name, device_name)
+                            self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, segment_enable=self.segment_enable)
+                            port_name = 'ha_' + lb_id + "_pool"
+                            ret_ports = self.plugin_rpc.get_port_by_name(self.context, port_name)
+                            LOG.debug("Got the ret_ports(%s) by the port_name(%s)", ret_ports, port_name)
+                            if ret_ports:
+                                pool_address = ret_ports[0]['fixed_ips'][0]['ip_address']
+                                cmd_ha_group_fip_pool = ADCDevice.ha_group_fip_apv(group_id, pool_address, segment_name, device_name)
+                                self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, segment_enable=self.segment_enable)
+                            self.synconfig_from_segment(base_rest_url, idx, segment_name)
+                    else:
+                        LOG.debug("Cannot to get port by name(%s)" % port_name)
+                        continue
             cmd_write_memory = ADCDevice.write_memory()
             self.run_cli_extend(base_rest_url, cmd_write_memory, segment_enable=self.segment_enable)
             cmd_write_segment_memory = ADCDevice.write_segment_memory()
@@ -1193,7 +1241,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         segment_names = []
 
         if isinstance(lb_ids, list):
-            for lb_id, subnet_id, vip_address in lb_ids:
+            for lb_id, subnet_id, vip_address, vip_port_id in lb_ids:
                 ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
                 segment_name = ret_segment_name['segment_name']
                 segment_names.append(segment_name)
