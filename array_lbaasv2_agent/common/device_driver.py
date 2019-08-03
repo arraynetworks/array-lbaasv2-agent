@@ -250,6 +250,13 @@ class ArrayADCDriver(object):
         argu['vip_address'] = lb['vip_port']['fixed_ips'][0]['ip_address']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
 
+        try:
+            argu['redirect_up'] = listener['redirect_up']
+            argu['redirect_protocol'] = listener['redirect_protocol']
+            argu['redirect_port'] = listener['redirect_port']
+        except KeyError:
+            argu['redirect_up'] = False
+
         pool = listener['default_pool']
 
         if pool:
@@ -304,6 +311,13 @@ class ArrayADCDriver(object):
 
         lb = listener['loadbalancer']
         argu['vip_id'] = lb['stats']['loadbalancer_id']
+
+        try:
+            argu['redirect_up'] = listener['redirect_up']
+            argu['redirect_protocol'] = listener['redirect_protocol']
+            argu['redirect_port'] = listener['redirect_port']
+        except KeyError:
+            argu['redirect_up'] = False
 
         pool = listener['default_pool']
         if pool:

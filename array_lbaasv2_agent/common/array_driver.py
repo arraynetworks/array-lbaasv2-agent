@@ -181,6 +181,9 @@ class ArrayCommonAPIDriver(object):
         self._create_vs(argu['listener_id'], argu['vip_address'], argu['protocol'],
                         argu['protocol_port'], argu['connection_limit'], va_name)
 
+        if not argu['redirect_up']:
+            pass
+
         if argu['pool_id']:
             self._create_policy(argu['pool_id'], argu['listener_id'],
                                 argu['session_persistence_type'], argu['lb_algorithm'],
@@ -198,6 +201,9 @@ class ArrayCommonAPIDriver(object):
         # delete vs
         self._delete_vs(argu['listener_id'], argu['protocol'],
             argu['protocol_port'], va_name)
+
+        if not argu['redirect_up']:
+            pass
 
         if argu['pool_id']:
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
