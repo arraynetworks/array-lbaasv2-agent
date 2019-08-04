@@ -890,12 +890,18 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             lb_mems[lb_id][member_name] = lb_const.ONLINE
         return lb_mems
 
-    def reset_off_host(self):
+    def reset_off_host(self, check_health=False):
+        if len(self.base_rest_urls) == 1:
+            return
         cmd_show_ip_addr = ADCDevice.show_ip_addr()
         LOG.debug("Current self.off_host is %s" % self.off_host)
+        status = True
         for base_rest_url in self.base_rest_urls:
-            status = self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
-                segment_enable=self.segment_enable, check_off_host=False)
+            if not check_health:
+                status = self.run_cli_extend(base_rest_url, cmd_show_ip_addr,
+                    segment_enable=self.segment_enable, check_off_host=False)
+            else:
+                status = self.get_restful_health_check(base_rest_url)
             if not status:
                 if base_rest_url not in self.off_host:
                     self.off_host.append(base_rest_url)
@@ -1206,7 +1212,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
     def delete_redundant_segment_configuration(self):
         try:
             if redundant_segments:
-                self.reset_off_host()
+                self.reset_off_host(check_health=True)
                 need_write_memory = False
                 base_rest_url = ""
                 for segment_name in redundant_segments.keys():
@@ -1288,6 +1294,10 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return True
 
         active_agents = self.plugin_rpc.get_active_agents(self.context)
+        if len(active_agents) == 0:
+            LOG.debug("No active agent, so exiting.")
+            return True
+
         master_agent = active_agents[0]
         agent_host = cfg.CONF.arraynetworks.agent_host
         if master_agent['host'] != agent_host:
@@ -1295,7 +1305,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             return True
 
         global g_off_hosts
-        self.reset_off_host()
+        self.reset_off_host(check_health=True)
         LOG.debug("It will check the status of Host, current off hosts is : %s" % g_off_hosts)
         for idx, base_rest_url in enumerate(self.base_rest_urls):
             host_status = self.get_restful_status(base_rest_url)
@@ -1329,7 +1339,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
 
     def update_member_status(self, agent_host_name):
-        self.reset_off_host()
+        self.reset_off_host(check_health=True)
         lb_members = self.plugin_rpc.get_members_status_on_agent(self.context,
             agent_host_name)
         lb_members_ori = copy.deepcopy(lb_members)
