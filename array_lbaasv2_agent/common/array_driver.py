@@ -869,3 +869,20 @@ class ArrayCommonAPIDriver(object):
             self.plugin_rpc.delete_port_by_name(self.context, port_name)
         return
 
+    def get_restful_health_check(self, base_rest_url):
+        url = base_rest_url + '/health_check'
+        payload = {}
+        try:
+            r = requests.get(url,
+                json.dumps(payload),
+                auth=self.get_auth(),
+                timeout=(5, 5),
+                verify=False)
+            LOG.debug("it can get response from url(%s) using health_check: %s", base_rest_url, r.text)
+        except Exception as e:
+            LOG.debug("it raise the exception: %s", e.message)
+            return False
+        if not r:
+            return False
+        return True
+
