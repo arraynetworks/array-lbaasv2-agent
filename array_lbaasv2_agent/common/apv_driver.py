@@ -498,7 +498,6 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         self.run_cli_extend(base_rest_url, cmd_ha_group_id, va_name, self.segment_enable)
 
         cmd_ip_pool = ADCDevice.ip_pool(pool_name, pool_address)
-        self.run_cli_extend(base_rest_url, cmd_ip_pool, va_name)
 
         for unit_item in unit_list:
             unit_name = unit_item['name']
@@ -518,6 +517,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
 
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_vip, va_name, self.segment_enable)
         self.run_cli_extend(base_rest_url, cmd_ha_group_fip_pool, va_name, self.segment_enable)
+        self.run_cli_extend(base_rest_url, cmd_ip_pool, va_name)
         self.run_cli_extend(base_rest_url, cmd_ha_group_enable, va_name, self.segment_enable)
 
         self.run_cli_extend(base_rest_url, cmd_ha_decision_rule, va_name, self.segment_enable)
