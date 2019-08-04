@@ -253,17 +253,19 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
         if len(self.hostnames) == 1:
             if self.net_seg_enable:
                 if not existed_segment:
+                    res_inst_ports = self.create_instance_ports(argu, segment_name)
                     internal_ip = self.plugin_rpc.get_available_internal_ip(self.context,
-                        segment_name, argu['ip_address'])
+                        segment_name, res_inst_ports['ip_address'])
                     if internal_ip == None:
                         LOG.error("Failed to get available internal ip address for create loadbalancer")
                         return
                     self._create_vlan_device(self.base_rest_urls, argu['vlan_tag'], va_name, interface)
                     self._segment_interface(self.base_rest_urls, argu['vlan_tag'], segment_name, va_name, interface)
-                    self._create_vip(self.base_rest_urls, argu['ip_address'],argu['netmask'],
+                    self._create_vip(self.base_rest_urls, res_inst_ports['ip_address'],argu['netmask'],
                         argu['vlan_tag'], argu['gateway'], va_name, internal_ip)
             else:
-                self._create_vip(self.base_rest_urls, argu['ip_address'],argu['netmask'],
+                res_inst_ports = self.create_instance_ports(argu, segment_name)
+                self._create_vip(self.base_rest_urls, res_inst_ports['ip_address'], argu['netmask'],
                     argu['vlan_tag'], argu['gateway'], va_name, internal_ip)
         else:
             if self.net_seg_enable:
