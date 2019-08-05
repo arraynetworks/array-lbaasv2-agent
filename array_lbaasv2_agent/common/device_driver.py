@@ -257,6 +257,12 @@ class ArrayADCDriver(object):
         except KeyError:
             argu['redirect_up'] = False
 
+        try:
+            argu['mutual_authentication_up'] = listener['mutual_authentication_up']
+            argu['ca_container_id'] = listener['ca_container_id']
+        except KeyError:
+            argu['mutual_authentication_up'] = False
+
         pool = listener['default_pool']
 
         if pool:
