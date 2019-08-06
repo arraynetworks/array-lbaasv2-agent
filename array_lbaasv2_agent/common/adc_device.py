@@ -749,7 +749,7 @@ class ADCDevice(object):
 
     @staticmethod
     def monitor_vcondition_name_apv(group_id):
-        cmd = "monitor vcondition name v%d VCONDITION_%d AND" % (group_id, group_id)
+        cmd = "monitor vcondition name v%d VCONDITION_%d OR" % (group_id, group_id)
         return cmd
 
     @staticmethod
