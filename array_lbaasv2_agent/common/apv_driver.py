@@ -360,6 +360,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 LOG.debug("Will delete the ports created by segment")
                 self.delete_instance_ports(segment_name)
                 self._delete_vip(str(argu['vlan_tag']), va_name)
+                self.plugin_rpc.release_internal_ip_by_lb(self.context,
+                    segment_name, argu['vip_address'], use_for_nat=False)
         else:
             LOG.debug("Will delete the ports created by segment")
             self.delete_instance_ports(segment_name)
@@ -476,6 +478,9 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
             if not internal_ip:
                 LOG.error("Failed to find the internal ip by segment name(%s) and segment ip(%s)" % (argu['vip_id'], member_address))
                 return
+            else:
+                self.plugin_rpc.release_internal_ip_by_lb(self.context,
+                    segment_name, member_address, use_for_nat=True)
             cmd_delete_segment_nat = ADCDevice.delete_segment_nat(segment_name, internal_ip, member_address, netmask)
             cmd_delete_route_static = ADCDevice.delete_route_static(member_address, netmask, argu['gateway'])
             for base_rest_url in self.base_rest_urls:

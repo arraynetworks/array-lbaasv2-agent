@@ -244,6 +244,11 @@ class ArrayPluginApi(object):
         return cctxt.call(context, 'get_internal_ip_by_lb',
             seg_name=segment_name, seg_ip=segment_ip, use_for_nat=use_for_nat)
 
+    def release_internal_ip_by_lb(self, context, segment_name, segment_ip, use_for_nat=False):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'release_internal_ip_by_lb',
+            seg_name=segment_name, seg_ip=segment_ip, use_for_nat=use_for_nat)
+
     def get_interface(self, context):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_interface')
