@@ -1027,8 +1027,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             vip_network = netaddr.IPNetwork(subnet['cidr'])
                             netmask = str(vip_network.netmask)
                             if vip_network.version == 6:
-                                idx = subnet['cidr'].find('/')
-                                netmask = subnet['cidr'][idx+1:]
+                                sub_idx = subnet['cidr'].find('/')
+                                netmask = subnet['cidr'][sub_idx+1:]
                             cmd_configure_ip = ADCDevice.configure_ip(device_name, ip_address, netmask)
                             self.run_cli_extend(base_rest_url, cmd_configure_ip,
                                 segment_enable=self.segment_enable)
@@ -1096,8 +1096,8 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             vip_network = netaddr.IPNetwork(subnet['cidr'])
                             netmask = str(vip_network.netmask)
                             if vip_network.version == 6:
-                                idx = subnet['cidr'].find('/')
-                                netmask = subnet['cidr'][idx+1:]
+                                sub_idx = subnet['cidr'].find('/')
+                                netmask = subnet['cidr'][sub_idx+1:]
                             internal_ip = self.plugin_rpc.get_internal_ip_by_lb(self.context, segment_name, vip_address)
                             LOG.debug("get the internal ip(%s) by segment(%s) and ip(%s)", internal_ip, segment_name, vip_address)
                             if not internal_ip:
