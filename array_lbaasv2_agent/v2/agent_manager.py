@@ -12,7 +12,6 @@
 #
 
 from oslo_config import cfg
-from oslo_log import helpers as log_helpers
 import logging
 import traceback
 import oslo_messaging

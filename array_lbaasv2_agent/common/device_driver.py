@@ -72,6 +72,11 @@ OPTS = [
         default=('array_lbaasv2_agent.common.avx_driver.ArrayAVXAPIDriver'),
         help=('The driver used to provision ADC product')
     ),
+    cfg.StrOpt(
+        'sdn_vendor',
+        default=('Name of supported SDN Vendor'),
+        help=('The driver used to provision ADC product')
+    ),
     cfg.BoolOpt(
         'net_seg_enable',
         default=False,
@@ -128,29 +133,36 @@ class ArrayADCDriver(object):
         argu = {}
 
         port_id = lb['vip_port_id']
+        subnet_id = lb['vip_subnet_id']
 
+        vlan_tag = '-1'
         port_status = None
-        LOG.debug("Get the status of vip_port")
-        for a in six.moves.xrange(5):
-            ret_port = self.plugin_rpc.get_port(self.context, port_id)
-            if not ret_port:
-                msg = "Failed to get port by port_id %s" % port_id
-                raise ArrayADCException(msg)
-            LOG.debug("ret_port: --%s--", ret_port)
-            port_status = ret_port['status']
-            if port_status == n_const.PORT_STATUS_ERROR:
-                msg = "Failed to create port by the SDN controller"
-                raise ArrayADCException(msg)
-            elif port_status == n_const.PORT_STATUS_BUILD:
-                LOG.debug("The port is still building, so waiting...")
-                time.sleep(3)
+        if "huawei" in self.conf.arraynetworks.sdn_vendor:
+            LOG.debug("Get the status of vip_port")
+            for a in six.moves.xrange(5):
+                ret_port = self.plugin_rpc.get_port(self.context, port_id)
+                if not ret_port:
+                    msg = "Failed to get port by port_id %s" % port_id
+                    raise ArrayADCException(msg)
+                LOG.debug("ret_port: --%s--", ret_port)
+                port_status = ret_port['status']
+                if port_status == n_const.PORT_STATUS_ERROR:
+                    msg = "Failed to create port by the SDN controller"
+                    raise ArrayADCException(msg)
+                elif port_status == n_const.PORT_STATUS_BUILD:
+                    LOG.debug("The port is still building, so waiting...")
+                    time.sleep(3)
 
-        if port_status == n_const.PORT_STATUS_ERROR or \
-            port_status == n_const.PORT_STATUS_BUILD:
-            msg = "Timeout to create port by the SDN controller"
-            raise ArrayADCException(msg)
+            if port_status == n_const.PORT_STATUS_ERROR or \
+                port_status == n_const.PORT_STATUS_BUILD:
+                msg = "Timeout to create port by the SDN controller"
+                raise ArrayADCException(msg)
+            ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
+        elif "cmcc" in self.conf.arraynetworks.sdn_vendor:
+            ret_vlan = self.plugin_rpc.get_vlan_id_by_port_cmcc(self.context, port_id)
+        elif "nuage" in self.conf.arraynetworks.sdn_vendor:
+            ret_vlan = self.plugin_rpc.get_vlan_by_subnet_id(self.context, subnet_id)
 
-        ret_vlan = self.plugin_rpc.get_vlan_id_by_port_huawei(self.context, port_id)
         vlan_tag = ret_vlan['vlan_tag']
         if vlan_tag == '-1':
             LOG.debug("Cann't get the vlan_tag by port_id(%s)", port_id)
@@ -159,7 +171,6 @@ class ArrayADCDriver(object):
             LOG.debug("Got the vlan_tag(%s) by port_id(%s)", vlan_tag, port_id)
             argu['vlan_tag'] = vlan_tag
 
-        subnet_id = lb['vip_subnet_id']
         subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
         member_network = netaddr.IPNetwork(subnet['cidr'])
 

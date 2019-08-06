@@ -176,6 +176,10 @@ class ArrayPluginApi(object):
             lb_id=lb_id, subnet_id=subnet_id,
             tenant_id=tenant_id, segment_name=segment_name)
 
+    def get_vlan_by_subnet_id(self, context, subnet_id):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'get_vlan_by_subnet_id', subnet_id=subnet_id)
+
     def get_segment_name_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_segment_name_by_lb_id', vip_id=vip_id)
