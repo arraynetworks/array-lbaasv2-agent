@@ -1,0 +1,23 @@
+nat enable正常删除：
+	1. no ip pool
+	2. no ha group id
+	3. no ha decision
+	4. no segment name
+	5. no segment user(api+config)
+	6. no vlan <vlan_name>
+	7. write memory
+
+nat disable正常删除：
+	1. no ip pool
+	2. no ha group id
+	3. no ha decision
+	4. no segment name
+	5. no segment user(api+config)
+	6. no vlan <vlan_name>
+	7. write memory
+
+nat enable/disable异常删除：
+	1. no segment name
+	2. no segment user(api)
+	3. no vlan <vlan_name>
+	4.write memory
