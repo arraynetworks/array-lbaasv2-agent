@@ -495,6 +495,16 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def http_redirect_https(vs_name):
+        cmd = "http redirect https %s" % (vs_name)
+        return cmd
+
+    @staticmethod
+    def no_http_redirect_https(vs_name):
+        cmd = "no http redirect https %s" % (vs_name)
+        return cmd
+
+    @staticmethod
     def no_redirect_to_url(vs_name, policy_name):
         cmd = "no http redirect url %s %s" % (vs_name, policy_name)
         return cmd

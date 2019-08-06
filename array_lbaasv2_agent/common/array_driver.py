@@ -182,7 +182,9 @@ class ArrayCommonAPIDriver(object):
                         argu['protocol_port'], argu['connection_limit'], va_name)
 
         if not argu['redirect_up']:
-            pass
+            cmd_http_redirect_https = ADCDevice.http_redirect_https(argu['listener_id'])
+            for base_rest_url in self.base_rest_urls:
+                self.run_cli_extend(base_rest_url, cmd_http_redirect_https, va_name)
 
         if argu['pool_id']:
             self._create_policy(argu['pool_id'], argu['listener_id'],
@@ -203,7 +205,9 @@ class ArrayCommonAPIDriver(object):
             argu['protocol_port'], va_name)
 
         if not argu['redirect_up']:
-            pass
+            cmd_no_http_redirect_https = ADCDevice.no_http_redirect_https(argu['listener_id'])
+            for base_rest_url in self.base_rest_urls:
+                self.run_cli_extend(base_rest_url, cmd_no_http_redirect_https, va_name)
 
         if argu['pool_id']:
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
