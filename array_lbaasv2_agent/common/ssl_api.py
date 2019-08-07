@@ -25,10 +25,9 @@ except ImportError:
 certificate_manager = CERT_MANAGER_PLUGIN.CertManager()
 LOG = logging.getLogger(__name__)
 
-def _get_vhost_id(listener):
-    default_cid = listener['default_tls_container_id']
-    vhost_id_idx = default_cid.rfind('/') + 1
-    return default_cid[vhost_id_idx:]
+def _get_vhost_id(container_id):
+    vhost_id_idx = container_id.rfind('/') + 1
+    return container_id[vhost_id_idx:]
 
 def _get_service_name():
     service_name = "arrayvapv provider"
@@ -37,13 +36,31 @@ def _get_service_name():
         service_name = "arrayvapv-%s provider" % envir
     return service_name
 
-def config_ssls(listener, driver, va_name):
-    vhost_id = _get_vhost_id(listener)
+def config_client_ssl(listener, driver, va_name):
+    ca_container_id = listener['ca_container_id']
+    vhost_id = _get_vhost_id(ca_container_id)
+
+    _upload_certificate(driver, listener, ca_container_id,
+        vhost_id, va_name, default=True, clientauth=True)
+
+    driver.start_vhost(vhost_id, va_name)
+
+def clear_client_ssl(listener, driver, va_name):
+    default_tls_container_id = listener['default_tls_container_id']
+    vhost_id = _get_vhost_id(default_tls_container_id)
+
+    # Delete default certificate
+    _no_certificate(driver, listener, default_tls_container_id,
+        vhost_id, va_name, default=True, clientauth=True)
+
+
+def config_server_ssls(listener, driver, va_name):
+    default_tls_container_id = listener['default_tls_container_id']
+    vhost_id = _get_vhost_id(default_tls_container_id)
 
     # Upload default certificate
-    _upload_certificate(driver, listener,
-        listener['default_tls_container_id'], vhost_id,
-        va_name, default=True)
+    _upload_certificate(driver, listener, default_tls_container_id,
+        vhost_id, va_name, default=True)
 
     # Configure SNI certificates
     if listener['sni_containers']:
@@ -58,7 +75,7 @@ def config_ssls(listener, driver, va_name):
 
 
 def _upload_certificate(driver, listener, container_id, vhost_id,
-    va_name, default = False):
+    va_name, default = False, clientauth=False):
     service_name = _get_service_name()
 
     # Get the certificate from Barbican
@@ -87,10 +104,11 @@ def _upload_certificate(driver, listener, container_id, vhost_id,
         domain_name = cert_hostnames['cn']
 
     driver.configure_ssl(vhost_id, listener['id'], cert.get_private_key(),
-        cert_chain, domain_name, va_name)
+        cert_chain, domain_name, va_name, clientauth=clientauth)
 
 
-def _no_certificate(driver, listener, container_id, vhost_id, va_name, default=False):
+def _no_certificate(driver, listener, container_id, vhost_id,
+    va_name, default=False, clientauth=False):
     service_name = _get_service_name()
 
     cert = certificate_manager.get_cert(
@@ -106,14 +124,16 @@ def _no_certificate(driver, listener, container_id, vhost_id, va_name, default=F
         cert_hostnames = get_host_names(cert.get_certificate())
         domain_name = cert_hostnames['cn']
 
-    driver.clear_ssl_cert(vhost_id, listener['id'], domain_name, va_name)
+    driver.clear_ssl_cert(vhost_id, listener['id'], domain_name,
+        va_name, clientauth=clientauth)
 
 
-def clean_up_certificates(listener, driver, va_name):
-    vhost_id = _get_vhost_id(listener)
+def clear_server_ssls(listener, driver, va_name):
+    default_tls_container_id = listener['default_tls_container_id']
+    vhost_id = _get_vhost_id(default_tls_container_id)
 
     # Delete default certificate
-    _no_certificate(driver, listener, listener['default_tls_container_id'],
+    _no_certificate(driver, listener, default_tls_container_id,
         vhost_id, va_name, default=True)
 
     # Delete SNI certificates

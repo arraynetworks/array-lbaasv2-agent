@@ -679,11 +679,11 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_start_vhost, va_name)
 
 
-    def configure_ssl(self, vhost_name, vs_name,
-                      key_content, cert_content,
-                      domain_name, va_name):
+    def configure_ssl(self, vhost_name, vs_name, key_content, cert_content,
+        domain_name, va_name, clientauth=False):
         cmd_create_vhost = None
         cmd_associate_domain_to_vhost = None
+        cmd_ssl_settings_clientauth = None
         if not domain_name:
             cmd_create_vhost = ADCDevice.create_ssl_vhost(vhost_name, vs_name)
         cmd_import_ssl_key = ADCDevice.import_ssl_key(vhost_name, key_content, domain_name)
@@ -691,16 +691,18 @@ class ArrayCommonAPIDriver(object):
         cmd_activate_cert = ADCDevice.activate_certificate(vhost_name, domain_name)
         if domain_name:
             cmd_associate_domain_to_vhost = ADCDevice.associate_domain_to_vhost(vhost_name, domain_name)
+        if clientauth:
+            cmd_ssl_settings_clientauth = ADCDevice.ssl_settings_clientauth(vhost_name)
         for base_rest_url in self.base_rest_urls:
-            if cmd_create_vhost:
-                self.run_cli_extend(base_rest_url, cmd_create_vhost, va_name)
-            if cmd_associate_domain_to_vhost:
-                self.run_cli_extend(base_rest_url, cmd_associate_domain_to_vhost, va_name)
+            self.run_cli_extend(base_rest_url, cmd_create_vhost, va_name)
+            self.run_cli_extend(base_rest_url, cmd_associate_domain_to_vhost, va_name)
             self.run_cli_extend(base_rest_url, cmd_import_ssl_key, va_name)
             self.run_cli_extend(base_rest_url, cmd_import_ssl_cert, va_name)
             self.run_cli_extend(base_rest_url, cmd_activate_cert, va_name)
+            self.run_cli_extend(base_rest_url, cmd_ssl_settings_clientauth, va_name)
 
-    def clear_ssl_cert(self, vhost_name, vs_name, domain_name, va_name):
+    def clear_ssl_cert(self, vhost_name, vs_name, domain_name, va_name, clientauth=False):
+        cmd_no_ssl_settings_clientauth = None
         cmd_stop_vhost = ADCDevice.stop_vhost(vhost_name)
         cmd_deactivate_certificate = ADCDevice.deactivate_certificate(vhost_name, domain_name)
         if domain_name:
@@ -708,9 +710,12 @@ class ArrayCommonAPIDriver(object):
         cmd_no_ssl_cert = ADCDevice.no_ssl_cert(vhost_name)
         cmd_no_ssl_vhost = ADCDevice.no_ssl_vhost(vhost_name, vs_name)
         cmd_clear_ssl_vhost = ADCDevice.clear_ssl_vhost(vhost_name)
+        if clientauth:
+            cmd_no_ssl_settings_clientauth = ADCDevice.no_ssl_settings_clientauth(vhost_name)
         for base_rest_url in self.base_rest_urls:
             self.run_cli_extend(base_rest_url, cmd_stop_vhost, va_name)
             self.run_cli_extend(base_rest_url, cmd_deactivate_certificate, va_name)
+            self.run_cli_extend(base_rest_url, cmd_no_ssl_settings_clientauth, va_name)
             if domain_name:
                 self.run_cli_extend(base_rest_url, cmd_disassociate_domain_to_vhost, va_name)
             self.run_cli_extend(base_rest_url, cmd_no_ssl_cert, va_name)

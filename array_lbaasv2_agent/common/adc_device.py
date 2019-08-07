@@ -269,6 +269,16 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def ssl_settings_clientauth(vhost_name):
+        cmd = 'ssl settings clientauth %s' % (vhost_name)
+        return cmd
+
+    @staticmethod
+    def no_ssl_settings_clientauth(vhost_name):
+        cmd = 'no ssl settings clientauth %s' % (vhost_name)
+        return cmd
+
+    @staticmethod
     def start_vhost(vhost_name):
         cmd = 'ssl start %s' % (vhost_name)
         return cmd

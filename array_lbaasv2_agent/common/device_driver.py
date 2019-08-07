@@ -18,11 +18,11 @@ from oslo_utils import importutils
 import logging
 import six
 import time
+import traceback
 
 from neutron_lib import constants as n_const
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
-from array_lbaasv2_agent.common.ssl_api import config_ssls
-from array_lbaasv2_agent.common.ssl_api import clean_up_certificates
+from array_lbaasv2_agent.common import ssl_api
 
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
 from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
@@ -270,12 +270,6 @@ class ArrayADCDriver(object):
         except KeyError:
             argu['redirect_up'] = False
 
-        try:
-            argu['mutual_authentication_up'] = listener['mutual_authentication_up']
-            argu['ca_container_id'] = listener['ca_container_id']
-        except KeyError:
-            argu['mutual_authentication_up'] = False
-
         pool = listener['default_pool']
 
         if pool:
@@ -299,7 +293,15 @@ class ArrayADCDriver(object):
         if listener['protocol'] == 'TERMINATED_HTTPS':
             if listener['default_tls_container_id']:
                 va_name = self.driver.get_va_name(argu)
-                config_ssls(self.driver, listener, va_name)
+                ssl_api.config_server_ssls(self.driver, listener, va_name)
+                try:
+                    if listener['mutual_authentication_up']:
+                        ssl_api.config_client_ssl(self.driver, listener, va_name)
+                except KeyError as e:
+                    LOG.debug("It fails to parse mutual_authentication_up: %s", e.message)
+                except Exception as e:
+                    LOG.debug("Trace: %s " % traceback.format_exc())
+                    LOG.debug("Failed to config client ssl %s" % e.message)
 
         if not updated:
             self.driver.write_memory(argu)
@@ -361,7 +363,15 @@ class ArrayADCDriver(object):
         if listener['protocol'] == 'TERMINATED_HTTPS':
             if listener['default_tls_container_id']:
                 va_name = self.driver.get_va_name(argu)
-                clean_up_certificates(self.driver, listener, va_name)
+                ssl_api.clear_server_ssls(self.driver, listener, va_name)
+                try:
+                    if listener['mutual_authentication_up']:
+                        ssl_api.clear_client_ssl(self.driver, listener, va_name)
+                except KeyError as e:
+                    LOG.debug("It fails to parse mutual_authentication_up: %s", e.message)
+                except Exception as e:
+                    LOG.debug("Trace: %s " % traceback.format_exc())
+                    LOG.debug("Failed to config client ssl %s" % e.message)
 
         self.driver.delete_listener(argu)
 
