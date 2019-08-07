@@ -181,10 +181,13 @@ class ArrayCommonAPIDriver(object):
         self._create_vs(argu['listener_id'], argu['vip_address'], argu['protocol'],
                         argu['protocol_port'], argu['connection_limit'], va_name)
 
-        if not argu['redirect_up']:
+        if argu['redirect_up']:
             cmd_http_redirect_https = ADCDevice.http_redirect_https(argu['listener_id'])
             for base_rest_url in self.base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_http_redirect_https, va_name)
+
+        if argu['mutual_authentication_up']:
+            pass
 
         if argu['pool_id']:
             self._create_policy(argu['pool_id'], argu['listener_id'],
@@ -204,10 +207,13 @@ class ArrayCommonAPIDriver(object):
         self._delete_vs(argu['listener_id'], argu['protocol'],
             argu['protocol_port'], va_name)
 
-        if not argu['redirect_up']:
+        if argu['redirect_up']:
             cmd_no_http_redirect_https = ADCDevice.no_http_redirect_https(argu['listener_id'])
             for base_rest_url in self.base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_no_http_redirect_https, va_name)
+
+        if argu['mutual_authentication_up']:
+            pass
 
         if argu['pool_id']:
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
@@ -694,7 +700,7 @@ class ArrayCommonAPIDriver(object):
             self.run_cli_extend(base_rest_url, cmd_import_ssl_cert, va_name)
             self.run_cli_extend(base_rest_url, cmd_activate_cert, va_name)
 
-    def clear_ssl(self, vhost_name, vs_name, domain_name, va_name):
+    def clear_ssl_cert(self, vhost_name, vs_name, domain_name, va_name):
         cmd_stop_vhost = ADCDevice.stop_vhost(vhost_name)
         cmd_deactivate_certificate = ADCDevice.deactivate_certificate(vhost_name, domain_name)
         if domain_name:

@@ -21,6 +21,8 @@ import time
 
 from neutron_lib import constants as n_const
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
+from array_lbaasv2_agent.common.ssl_api import config_ssls
+from array_lbaasv2_agent.common.ssl_api import clean_up_certificates
 
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
 from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
@@ -294,6 +296,11 @@ class ArrayADCDriver(object):
 
         self.driver.create_listener(argu)
 
+        if listener['protocol'] == 'TERMINATED_HTTPS':
+            if listener['default_tls_container_id']:
+                va_name = self.driver.get_va_name(argu)
+                config_ssls(self.driver, listener, va_name)
+
         if not updated:
             self.driver.write_memory(argu)
 
@@ -350,6 +357,11 @@ class ArrayADCDriver(object):
 
         if not updated:
             self.driver.reset_off_host()
+
+        if listener['protocol'] == 'TERMINATED_HTTPS':
+            if listener['default_tls_container_id']:
+                va_name = self.driver.get_va_name(argu)
+                clean_up_certificates(self.driver, listener, va_name)
 
         self.driver.delete_listener(argu)
 
