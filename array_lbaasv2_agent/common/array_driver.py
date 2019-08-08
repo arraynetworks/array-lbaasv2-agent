@@ -23,6 +23,7 @@ from neutron_lbaas.services.loadbalancer import constants as lb_const
 from array_lbaasv2_agent.common.adc_device import ADCDevice
 from array_lbaasv2_agent.common.adc_device import is_driver_apv
 from array_lbaasv2_agent.common import exceptions as driver_except
+from array_lbaasv2_agent.common import nuage_api
 
 LOG = logging.getLogger(__name__)
 
@@ -864,11 +865,15 @@ class ArrayCommonAPIDriver(object):
                 port = self.plugin_rpc.create_port_on_subnet(self.context,
                     subnet_id, port_name, hostname, argu['vip_id'])
                 interfaces['address'] = port['fixed_ips'][0]['ip_address']
+                if "nuage" in cfg.CONF.arraynetworks.sdn_vendor:
+                    nuage_api.nuage_bind_vlan_to_vport(argu['vlan_uuid'], port['id'])
                 res_ports[host] = interfaces
         else:
             port_name = instance_name + "_port"
             ip_port = self.plugin_rpc.create_port_on_subnet(self.context,
                 subnet_id, port_name, hostname, argu['vip_id'])
+            if "nuage" in cfg.CONF.arraynetworks.sdn_vendor:
+                nuage_api.nuage_bind_vlan_to_vport(argu['vlan_uuid'], ip_port['id'])
             res_ports['ip_address'] = ip_port['fixed_ips'][0]['ip_address']
         return res_ports
 

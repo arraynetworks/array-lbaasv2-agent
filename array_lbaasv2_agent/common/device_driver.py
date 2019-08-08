@@ -23,6 +23,7 @@ import traceback
 from neutron_lib import constants as n_const
 from array_lbaasv2_agent.common.exceptions import ArrayADCException
 from array_lbaasv2_agent.common import ssl_api
+from array_lbaasv2_agent.common import nuage_api
 
 from array_lbaasv2_agent.common.constants import PROV_SEGMT_ID
 from array_lbaasv2_agent.common.constants import PROV_NET_TYPE
@@ -139,6 +140,7 @@ class ArrayADCDriver(object):
 
         vlan_tag = '-1'
         port_status = None
+        argu['vlan_uuid'] = None
         if "huawei" in self.conf.arraynetworks.sdn_vendor:
             LOG.debug("Get the status of vip_port")
             for a in six.moves.xrange(5):
@@ -164,6 +166,14 @@ class ArrayADCDriver(object):
             ret_vlan = self.plugin_rpc.get_vlan_id_by_port_cmcc(self.context, port_id)
         elif "nuage" in self.conf.arraynetworks.sdn_vendor:
             ret_vlan = self.plugin_rpc.get_vlan_by_subnet_id(self.context, subnet_id)
+            if ret_vlan['vlan_tag'] and (not ret_vlan['vlan_uuid']):
+                res = nuage_api.nuage_allocate_vlan(ret_vlan['vlan_tag'])
+                vlan_uuid = res['nuage_gateway_vlan']['id']
+                if vlan_uuid:
+                    nuage_api.nuage_bind_vlan_to_vport(vlan_uuid, port_id)
+                    self.plugin_rpc.update_vlan_uuid_by_subnet(self.context,
+                        subnet_id, vlan_uuid)
+                argu['vlan_uuid'] = vlan_uuid
 
         vlan_tag = ret_vlan['vlan_tag']
         if vlan_tag == '-1':

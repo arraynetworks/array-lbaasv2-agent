@@ -180,6 +180,11 @@ class ArrayPluginApi(object):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_vlan_by_subnet_id', subnet_id=subnet_id)
 
+    def update_vlan_uuid_by_subnet(self, context, subnet_id, vlan_uuid):
+        cctxt = self.client.prepare()
+        return cctxt.call(context, 'update_vlan_uuid_by_subnet',
+            subnet_id=subnet_id, vlan_uuid=vlan_uuid)
+
     def get_segment_name_by_lb_id(self, context, vip_id):
         cctxt = self.client.prepare()
         return cctxt.call(context, 'get_segment_name_by_lb_id', vip_id=vip_id)
