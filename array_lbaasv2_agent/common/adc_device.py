@@ -316,6 +316,11 @@ class ADCDevice(object):
         return cmd
 
     @staticmethod
+    def slb_virtual_application_bandwidth(vs_name, bandwidth):
+        cmd = "slb virtual application bandwidth %s %d %d" % (vs_name, bandwidth, bandwidth)
+        return cmd
+
+    @staticmethod
     def clear_config_all():
         cmd = "clear config all"
         return cmd
@@ -738,6 +743,7 @@ class ADCDevice(object):
     def ha_no_group_fip(group_id, ip_address):
         cmd = "no ha group fip %d %s" % (group_id, ip_address)
         return cmd
+
     @staticmethod
     def ha_no_group_fip_apv(group_id, ip_address, segment_name):
         cmd = "no segment ha group fip %d %s %s" % (group_id, ip_address, segment_name)

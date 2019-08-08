@@ -270,6 +270,11 @@ class ArrayADCDriver(object):
         except KeyError:
             argu['redirect_up'] = False
 
+        try:
+            argu['bandwidth'] = lb['bandwidth']
+        except KeyError:
+            argu['bandwidth'] = 0
+
         pool = listener['default_pool']
 
         if pool:

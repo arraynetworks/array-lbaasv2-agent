@@ -186,8 +186,13 @@ class ArrayCommonAPIDriver(object):
             for base_rest_url in self.base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_http_redirect_https, va_name)
 
-        if argu['mutual_authentication_up']:
-            pass
+        if argu['bandwidth']:
+            bandwidth = int(argu['bandwidth']) * 1024
+            cmd_slb_virtual_application_bandwidth = \
+                ADCDevice.slb_virtual_application_bandwidth(argu['listener_id'], bandwidth)
+            for base_rest_url in self.base_rest_urls:
+                self.run_cli_extend(base_rest_url,
+                    cmd_slb_virtual_application_bandwidth, va_name)
 
         if argu['pool_id']:
             self._create_policy(argu['pool_id'], argu['listener_id'],
@@ -211,9 +216,6 @@ class ArrayCommonAPIDriver(object):
             cmd_no_http_redirect_https = ADCDevice.no_http_redirect_https(argu['listener_id'])
             for base_rest_url in self.base_rest_urls:
                 self.run_cli_extend(base_rest_url, cmd_no_http_redirect_https, va_name)
-
-        if argu['mutual_authentication_up']:
-            pass
 
         if argu['pool_id']:
             self._delete_policy(argu['listener_id'], argu['session_persistence_type'],
