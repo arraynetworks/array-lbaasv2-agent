@@ -998,6 +998,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                 LOG.debug("No any loadbalancer in our current environment.")
                 return True
             base_rest_url = self.base_rest_urls[idx]
+            need_write_memory = False
             if not self.net_seg_enable:
                 for lb_id, subnet_id, vip_address, vip_port_id in lb_ids:
                     ret_segment_name = self.plugin_rpc.get_segment_name_by_lb_id(self.context, lb_id)
@@ -1027,6 +1028,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
                             self.run_cli_extend(base_rest_url, cmd_vlan_device,
                                 segment_enable=self.segment_enable)
+                            need_write_memory = True
                             ip_address = ret_ports[0]['fixed_ips'][0]['ip_address']
                             subnet = self.plugin_rpc.get_subnet(self.context, subnet_id)
                             vip_network = netaddr.IPNetwork(subnet['cidr'])
@@ -1093,6 +1095,7 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                             cmd_vlan_device = ADCDevice.vlan_device(interface_name, device_name, vlan_tag)
                             self.run_cli_extend(base_rest_url, cmd_vlan_device,
                                 segment_enable=self.segment_enable)
+                            need_write_memory = True
                             self._create_segment_config(base_rest_url, segment_name)
                             self._segment_interface(base_rest_url, vlan_tag, segment_name, None, interface_name)
                             #config segment ip address
@@ -1152,10 +1155,11 @@ class ArrayAPVAPIDriver(ArrayCommonAPIDriver):
                     else:
                         LOG.debug("Cannot to get port by name(%s)" % port_name)
                         continue
-            cmd_write_memory = ADCDevice.write_memory()
-            self.run_cli_extend(base_rest_url, cmd_write_memory, segment_enable=self.segment_enable)
-            cmd_write_segment_memory = ADCDevice.write_segment_memory()
-            self.run_cli_extend(base_rest_url, cmd_write_segment_memory, segment_enable=self.segment_enable)
+            if need_write_memory:
+                cmd_write_memory = ADCDevice.write_memory()
+                self.run_cli_extend(base_rest_url, cmd_write_memory, segment_enable=self.segment_enable)
+                cmd_write_segment_memory = ADCDevice.write_segment_memory()
+                self.run_cli_extend(base_rest_url, cmd_write_segment_memory, segment_enable=self.segment_enable)
         except Exception:
             LOG.debug("failed to recovery segment configuration: %s" % traceback.format_exc())
 
